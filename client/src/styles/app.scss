@@ -1,0 +1,90 @@
+// Compiled by Sass first, then PostCSS runs Tailwind over the output, so the
+// @tailwind directives pass through Sass untouched.
+@use 'tokens';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-ink-50 text-ink-900 antialiased;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2;
+  }
+}
+
+// Animations and component styles that are awkward as utility classes.
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+
+.anim-backdrop { animation: fade-in 150ms ease-out both; }
+.anim-dialog { animation: rise-in 200ms var(--ease-out) both; }
+.anim-toast { animation: rise-in 250ms var(--ease-out) both; }
+
+.spinner {
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 9999px;
+  animation: spin 700ms linear infinite;
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--color-ink-100)) 0%,
+    rgb(var(--color-ink-200)) 50%,
+    rgb(var(--color-ink-100)) 100%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 6px;
+}
+
+// Horizontal filter row: scrollable on small screens without a visible scrollbar.
+.chip-row {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.capacity-bar {
+  height: 6px;
+  border-radius: 9999px;
+  background: rgb(var(--color-ink-100));
+  overflow: hidden;
+
+  > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: rgb(var(--color-brand-500));
+    transition: width 400ms var(--ease-out);
+  }
+
+  &.is-full > span { background: rgb(var(--color-warning-500)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

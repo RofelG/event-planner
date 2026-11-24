@@ -1,21 +1,50 @@
 {
-  "name": "Volleyball_Web_App",
-  "version": "1.0.0",
-  "description": "Volleyball Node.js App with EJS templating",
+  "name": "event-planner",
+  "version": "2.0.0",
+  "description": "Event Planner: React/Vite SPA with an Express/MySQL REST API",
   "author": "Rofel Ganado <rofel_p_ganado@hotmail.com>",
-  "main": "server.js",
+  "main": "server/index.js",
+  "private": true,
   "scripts": {
-    "start": "node server.js"
+    "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "node --watch server/index.js",
+    "dev:web": "vite --strictPort",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:seed": "node server/db/seed.js",
+    "test": "jest --runInBand"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/tests"
+    ]
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "bootstrap-icons": "^1.10.2",
-    "cookie-parser": "^1.4.6",
-    "dotenv": "^16.0.3",
-    "ejs": "^3.1.8",
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.0",
-    "mysql": "^2.18.1",
-    "util": "^0.12.5"
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.5",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.24.6",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.3.0",
+    "autoprefixer": "^10.7.0",
+    "concurrently": "^10.0.7",
+    "jest": "^30.5.2",
+    "postcss": "^8.5.33",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.6",
+    "sass": "^1.108.2",
+    "supertest": "^7.3.2",
+    "tailwindcss": "^3.4.19",
+    "vite": "^8.3.8"
   }
 }
