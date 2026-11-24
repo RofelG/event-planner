@@ -22,11 +22,6 @@
   to { opacity: 1; }
 }
 
-@keyframes rise-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -36,9 +31,7 @@
   to { background-position: 400px 0; }
 }
 
-.anim-backdrop { animation: fade-in 150ms ease-out both; }
-.anim-dialog { animation: rise-in 200ms var(--ease-out) both; }
-.anim-toast { animation: rise-in 250ms var(--ease-out) both; }
+.anim-backdrop { animation: fade-in 200ms ease-out both; }
 
 .spinner {
   border: 2px solid currentColor;
@@ -76,15 +69,146 @@
     height: 100%;
     border-radius: inherit;
     background: rgb(var(--color-brand-500));
-    transition: width 400ms var(--ease-out);
+    // Same bounce easing: the bar overshoots slightly when a seat is taken.
+    transition: width 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   &.is-full > span { background: rgb(var(--color-warning-500)); }
 }
 
+// ------------------------------------------------------------------
+// Bounce motion: one easing curve and a few shapes used site-wide.
+// Tune the feel here, not per component. Approved on the event cards.
+// ------------------------------------------------------------------
+
+// Overshoots past the target, then settles back: the "bounce".
+$ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+$enter-duration: 650ms;
+$stagger-step: 70ms;
+$card-hover-lift: -6px;
+
+// Rises in, overshoots upward, dips slightly, then settles. The rise
+// distance comes from --bounce-y so pages, rows and cards share one shape
+// (overshoot and dip scale with it).
+@keyframes bounce-in-up {
+  0%   { opacity: 0; transform: translateY(var(--bounce-y, 24px)) scale(0.96); }
+  55%  { opacity: 1; transform: translateY(calc(var(--bounce-y, 24px) * -0.25)) scale(1.01); }
+  75%  { transform: translateY(calc(var(--bounce-y, 24px) * 0.08)) scale(0.997); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+// Drops down from above: menus and the mobile nav.
+@keyframes bounce-in-down {
+  0%   { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  60%  { opacity: 1; transform: translateY(3px) scale(1.02); }
+  80%  { transform: translateY(-1px) scale(0.995); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+// Grows in from slightly small: dialogs.
+@keyframes bounce-in-scale {
+  0%   { opacity: 0; transform: translateY(12px) scale(0.9); }
+  60%  { opacity: 1; transform: translateY(-3px) scale(1.02); }
+  80%  { transform: translateY(1px) scale(0.995); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+// Small elements (badges) pop in with a springy overshoot.
+@keyframes pop-in {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { opacity: 1; transform: scale(1.15); }
+  80%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+// Already-visible elements that just got selected: a quick squash and spring.
+@keyframes boing {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.08); }
+  65%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+// Entrance classes use fill mode `backwards` (not `both`): the animation
+// only owns `transform` until it ends, so hover and press transitions keep
+// working afterwards.
+
+// Generic entrance. Set --stagger (an index) to cascade lists and grids.
+.anim-bounce-in {
+  animation: bounce-in-up $enter-duration ease-out backwards;
+  animation-delay: calc(var(--stagger, 0) * #{$stagger-step});
+}
+
+// Route changes: a shorter rise so whole pages do not jump far.
+.anim-page {
+  --bounce-y: 12px;
+  animation: bounce-in-up 550ms ease-out backwards;
+}
+
+// Table rows and list items: small rise, quick cascade (capped at 10 steps).
+.anim-row {
+  --bounce-y: 10px;
+  animation: bounce-in-up 500ms ease-out backwards;
+  animation-delay: calc(min(var(--stagger, 0), 10) * 45ms);
+}
+
+.anim-dialog { animation: bounce-in-scale 500ms ease-out backwards; }
+.anim-toast { animation: bounce-in-up 550ms ease-out backwards; }
+.anim-menu {
+  transform-origin: top right;
+  animation: bounce-in-down 420ms ease-out backwards;
+}
+.anim-drop { animation: bounce-in-down 420ms ease-out backwards; }
+
+// Inline validation messages: drop in so the eye catches them.
+.anim-hint {
+  display: block;
+  animation: bounce-in-down 380ms ease-out backwards;
+}
+
+.anim-pop {
+  display: inline-flex;
+  animation: pop-in 450ms ease-out backwards;
+}
+
+// Springs when it becomes selected (chips, tabs, visibility options).
+// The animation starts the moment the selected state applies.
+.anim-select[aria-pressed='true'],
+.anim-select[aria-selected='true'],
+.anim-select:has(input:checked) {
+  animation: boing 400ms ease-out;
+}
+
+// Buttons and other pressables: springy lift on hover, squash on press.
+.press {
+  transition-property: transform, background-color, border-color, color, box-shadow;
+  transition-duration: 350ms, 150ms, 150ms, 150ms, 150ms;
+  transition-timing-function: $ease-bounce, ease, ease, ease, ease;
+
+  &:hover:not(:disabled) { transform: translateY(-1px); }
+  &:active:not(:disabled) {
+    transform: translateY(0) scale(0.95);
+    transition-duration: 90ms, 150ms, 150ms, 150ms, 150ms;
+  }
+}
+
+.event-card {
+  animation: bounce-in-up $enter-duration ease-out backwards;
+  // --stagger is the card's position in the grid, so cards cascade in.
+  animation-delay: calc(var(--stagger, 0) * #{$stagger-step});
+  transition: transform 350ms $ease-bounce, box-shadow 250ms ease;
+
+  &:hover,
+  &:focus-within {
+    transform: translateY($card-hover-lift);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 1ms !important;
+    // Without this, staggered elements would sit invisible during their delay.
+    animation-delay: 0ms !important;
     transition-duration: 1ms !important;
   }
 }

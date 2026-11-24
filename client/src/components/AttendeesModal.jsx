@@ -20,8 +20,8 @@ export function AttendeesModal({ event, onClose }) {
       {data && data.length === 0 && <EmptyState title="No one has signed up yet">Be the first to reserve a seat.</EmptyState>}
       {data && data.length > 0 && (
         <ul className="divide-y divide-ink-100">
-          {data.map((person) => (
-            <li key={person.id} className="flex items-center gap-3 py-2.5">
+          {data.map((person, i) => (
+            <li key={person.id} className="anim-row flex items-center gap-3 py-2.5" style={{ '--stagger': i }}>
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-xs font-semibold text-ink-700">
                 {initials(person.name)}
               </span>

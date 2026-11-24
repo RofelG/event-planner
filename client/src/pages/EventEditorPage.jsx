@@ -45,7 +45,7 @@ function InviteePicker({ people, selected, onChange, error }) {
         className="h-10 w-full rounded-lg border border-ink-300 bg-white px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
       />
       {matches.length > 0 && (
-        <ul className="mt-1 max-h-56 overflow-auto rounded-lg border border-ink-200 bg-white shadow-pop">
+        <ul className="anim-drop mt-1 max-h-56 overflow-auto rounded-lg border border-ink-200 bg-white shadow-pop">
           {matches.map((p) => (
             <li key={p.id}>
               <button
@@ -62,7 +62,7 @@ function InviteePicker({ people, selected, onChange, error }) {
       {chosen.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-2">
           {chosen.map((p) => (
-            <li key={p.id} className="flex items-center gap-1.5 rounded-full bg-ink-100 py-1 pl-3 pr-1 text-sm text-ink-800">
+            <li key={p.id} className="anim-pop items-center gap-1.5 rounded-full bg-ink-100 py-1 pl-3 pr-1 text-sm text-ink-800">
               {p.name}
               <button
                 type="button"
@@ -212,7 +212,7 @@ export function EventEditorPage() {
             ].map((opt) => (
               <label
                 key={opt.value}
-                className={`cursor-pointer rounded-lg border p-4 transition-colors ${form.visibility === opt.value ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-ink-200 hover:border-ink-300'}`}
+                className={`anim-select cursor-pointer rounded-lg border p-4 transition-colors ${form.visibility === opt.value ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-ink-200 hover:border-ink-300'}`}
               >
                 <input type="radio" name="visibility" value={opt.value} checked={form.visibility === opt.value} onChange={set('visibility')} className="sr-only" />
                 <span className="block text-sm font-semibold text-ink-900">{opt.label}</span>
@@ -223,7 +223,7 @@ export function EventEditorPage() {
           <p className="text-sm text-ink-600">{audienceSummary}</p>
 
           {form.visibility === 'restricted' && (
-            <div className="space-y-6 rounded-lg border border-ink-200 bg-ink-50 p-4">
+            <div className="anim-drop space-y-6 rounded-lg border border-ink-200 bg-ink-50 p-4">
               <div>
                 <p className="mb-2 text-sm font-medium text-ink-700">Share with groups</p>
                 {groups.data?.length ? (

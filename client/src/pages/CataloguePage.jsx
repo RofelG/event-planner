@@ -19,7 +19,7 @@ function useDebounced(value, delay = 300) {
 }
 
 const chip = (active) =>
-  `shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+  `press anim-select shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium ${
     active ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50'
   }`;
 
@@ -62,7 +62,7 @@ export function CataloguePage() {
           <p className="mt-1 text-sm text-ink-500">Welcome, {user.first}. Find an event and reserve your seat.</p>
         </div>
         {isPlanner && (
-          <Link to="/manage/new" className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 sm:hidden">
+          <Link to="/manage/new" className="press inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 sm:hidden">
             Create event
           </Link>
         )}
@@ -118,9 +118,11 @@ export function CataloguePage() {
         )}
 
         {shown.length > 0 && (
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {shown.map((event) => (
-              <EventCard key={event.id} event={event} actions={actions} onAttendees={setAttendeesFor} onDelete={setDeleting} />
+          // Keyed by the result set, so the cards cascade in again when a new
+          // filter result lands, not while the old list is still showing.
+          <div key={`${events.dataPath}|${onlyMine}`} className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {shown.map((event, i) => (
+              <EventCard key={event.id} index={i} event={event} actions={actions} onAttendees={setAttendeesFor} onDelete={setDeleting} />
             ))}
           </div>
         )}

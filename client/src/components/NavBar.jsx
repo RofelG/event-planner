@@ -5,7 +5,7 @@ import { initials, roleLabel } from '../lib/format';
 import { ChangePasswordModal } from './ChangePasswordModal';
 
 const linkClass = ({ isActive }) =>
-  `rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+  `press rounded-md px-3 py-2 text-sm font-medium ${
     isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900'
   }`;
 
@@ -65,7 +65,7 @@ export function NavBar() {
             <button
               type="button"
               onClick={() => navigate('/manage/new')}
-              className="hidden h-9 items-center rounded-lg bg-brand-600 px-3.5 text-sm font-medium text-white hover:bg-brand-700 sm:inline-flex"
+              className="press hidden h-9 items-center rounded-lg bg-brand-600 px-3.5 text-sm font-medium text-white hover:bg-brand-700 sm:inline-flex"
             >
               Create event
             </button>
@@ -77,7 +77,7 @@ export function NavBar() {
               onClick={() => setMenuOpen((o) => !o)}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              className="flex items-center gap-2 rounded-full p-1 pr-2 hover:bg-ink-100"
+              className="press flex items-center gap-2 rounded-full p-1 pr-2 hover:bg-ink-100"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
                 {initials(`${user.first} ${user.last}`)}
@@ -85,7 +85,7 @@ export function NavBar() {
               <span className="hidden text-sm font-medium text-ink-700 sm:block">{user.first}</span>
             </button>
             {menuOpen && (
-              <div role="menu" className="anim-dialog absolute right-0 mt-2 w-60 overflow-hidden rounded-xl border border-ink-200 bg-white shadow-pop">
+              <div role="menu" className="anim-menu absolute right-0 mt-2 w-60 overflow-hidden rounded-xl border border-ink-200 bg-white shadow-pop">
                 <div className="border-b border-ink-100 px-4 py-3">
                   <p className="truncate text-sm font-semibold text-ink-900">{user.first} {user.last}</p>
                   <p className="truncate text-xs text-ink-500">{user.email}</p>
@@ -103,7 +103,7 @@ export function NavBar() {
 
           <button
             type="button"
-            className="rounded-md px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100 md:hidden"
+            className="press rounded-md px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100 md:hidden"
             aria-expanded={mobileOpen}
             aria-controls="mobile-nav"
             onClick={() => setMobileOpen((o) => !o)}
@@ -114,7 +114,7 @@ export function NavBar() {
       </nav>
 
       {mobileOpen && (
-        <div id="mobile-nav" className="flex flex-col gap-1 border-t border-ink-100 px-4 py-3 md:hidden">
+        <div id="mobile-nav" className="anim-drop flex flex-col gap-1 border-t border-ink-100 px-4 py-3 md:hidden">
           {links}
           {isPlanner && <NavLink to="/manage/new" className={linkClass}>Create event</NavLink>}
         </div>

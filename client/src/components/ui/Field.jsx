@@ -18,7 +18,7 @@ export function Field({ label, hint, error, required, children, className = '' }
       )}
       {children({ id, 'aria-invalid': Boolean(error) || undefined, 'aria-describedby': describedBy, required })}
       {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger-700">{error}</p>
+        <p id={`${id}-error`} className="anim-hint mt-1.5 text-xs text-danger-700">{error}</p>
       ) : hint ? (
         <p id={`${id}-hint`} className="mt-1.5 text-xs text-ink-500">{hint}</p>
       ) : null}

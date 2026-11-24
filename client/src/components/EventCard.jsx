@@ -16,19 +16,25 @@ function Detail({ label, children }) {
  * Controls are driven by event.permissions, which the API computes per user.
  * Edit and Delete only render for the organizer, a planner in a group the event is shared with, or an admin.
  */
-export function EventCard({ event, actions, onAttendees, onDelete }) {
+export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) {
   const navigate = useNavigate();
   const { permissions: can } = event;
   const pct = Math.min(100, Math.round((event.attendeeCount / event.capacity) * 100));
   const seatsLeft = event.capacity - event.attendeeCount;
+  // Cap the stagger so a long list does not take seconds to finish appearing.
+  const stagger = Math.min(index, 8);
 
   return (
-    <article className="flex flex-col rounded-xl border border-ink-200 bg-white shadow-card transition-shadow hover:shadow-pop">
+    <article
+      style={{ '--stagger': stagger }}
+      className="event-card flex flex-col rounded-xl border border-ink-200 bg-white shadow-card hover:shadow-pop"
+    >
       <div className="flex flex-1 flex-col p-5">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="brand">{event.type.name}</Badge>
           {event.visibility === 'restricted' && <Badge tone="warning">Restricted</Badge>}
-          {event.isRegistered && <Badge tone="success">You are going</Badge>}
+          {/* Mounts when the user joins, so the pop plays as confirmation. */}
+          {event.isRegistered && <span className="anim-pop"><Badge tone="success">You are going</Badge></span>}
         </div>
 
         <h3 className="mt-3 text-lg font-semibold leading-snug text-ink-900">{event.name}</h3>
