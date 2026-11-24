@@ -1,10 +1,10 @@
 import { Spinner } from './Feedback';
 
 const variants = {
-  primary: 'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-300',
-  secondary: 'border border-ink-300 bg-white text-ink-700 hover:bg-ink-50 disabled:text-ink-400',
+  primary: 'bg-brand-600 text-white hover:bg-brand-700 dark:hover:bg-brand-600 dark:hover:brightness-90 disabled:bg-brand-300',
+  secondary: 'border border-ink-300 bg-surface text-ink-700 hover:bg-ink-50 disabled:text-ink-400',
   ghost: 'text-ink-600 hover:bg-ink-100 hover:text-ink-900 disabled:text-ink-300',
-  danger: 'bg-danger-600 text-white hover:bg-danger-700 disabled:bg-danger-300',
+  danger: 'bg-danger-600 text-white hover:bg-danger-700 dark:hover:bg-danger-600 dark:hover:brightness-90 disabled:bg-danger-300',
   'danger-ghost': 'text-danger-700 hover:bg-danger-50 disabled:text-danger-300',
 };
 

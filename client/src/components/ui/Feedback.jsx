@@ -23,7 +23,7 @@ export function Alert({ tone = 'error', title, children, action }) {
 
 export function EmptyState({ title, children, action }) {
   return (
-    <div className="anim-bounce-in rounded-xl border border-dashed border-ink-300 bg-white px-6 py-12 text-center">
+    <div className="anim-bounce-in rounded-xl border border-dashed border-ink-300 bg-surface px-6 py-12 text-center">
       <p className="text-base font-semibold text-ink-900">{title}</p>
       {children && <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">{children}</p>}
       {action && <div className="mt-5">{action}</div>}

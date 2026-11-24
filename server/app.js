@@ -6,7 +6,8 @@ const express = require('express');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const config = require('./config');
-const { authenticate } = require('./middleware/auth');
+const { authenticate, authenticateWith } = require('./middleware/auth');
+const live = require('./lib/live');
 const { HttpError } = require('./lib/errors');
 const authRoutes = require('./routes/auth');
 const eventRoutes = require('./routes/events');
@@ -37,6 +38,11 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 
 // Everything below requires a signed-in user.
+
+// Live catalogue updates (Server-Sent Events). Registered before /api/events so
+// it uses the non-sliding session check: an open tab must not keep an idle
+// session alive.
+app.get('/api/events/stream', authenticateWith({ slide: false }), live.stream);
 app.use('/api/events', authenticate, eventRoutes);
 app.use('/api/types', authenticate, adminRoutes.types);
 app.use('/api/users', authenticate, adminRoutes.users);

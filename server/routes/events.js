@@ -6,24 +6,14 @@ const groups = require('../repositories/groups');
 const users = require('../repositories/users');
 const schemas = require('../schemas');
 const policy = require('../lib/policy');
+const live = require('../lib/live');
+const { serializeEvent: serialize } = require('../lib/serialize');
 const { validate } = require('../middleware/validate');
 const { requireRole } = require('../middleware/auth');
 const { notFound, forbidden, badRequest } = require('../lib/errors');
 
 const router = express.Router();
 const planner = requireRole('planner', 'admin');
-
-/** Client-facing shape. Audience details are only shown to people who manage the event. */
-function serialize(user, event) {
-  const permissions = policy.eventPermissions(user, event);
-  const { organizerId, groupIds, inviteIds, ...rest } = event;
-  return {
-    ...rest,
-    isFull: event.attendeeCount >= event.capacity,
-    ...(permissions.edit ? { groupIds, inviteIds } : {}),
-    permissions,
-  };
-}
 
 /** Loads an event the user may see, or responds 404 (never 403, to avoid leaking existence). */
 async function loadVisible(req) {
@@ -66,6 +56,7 @@ router.post('/', planner, validate(schemas.event), async (req, res) => {
   if (data.end <= new Date()) throw badRequest('Please correct the highlighted fields.', { end: 'End must be in the future' });
   await checkReferences(data);
   const created = await events.create(req.user.id, data);
+  live.eventChanged(created.id);
   res.status(201).location(`/api/events/${created.id}`).json(serialize(req.user, created));
 });
 
@@ -75,6 +66,7 @@ router.put('/:id', planner, validate(schemas.idParam, 'params'), validate(schema
   if (!policy.canManageEvent(req.user, event)) throw forbidden('Only the organizer, a planner in a group it is shared with, or an admin can edit this event.');
   await checkReferences(req.valid.body);
   const updated = await events.update(event.id, req.user.id, req.valid.body);
+  live.eventChanged(event.id, event);
   res.json(serialize(req.user, updated));
 });
 
@@ -83,6 +75,7 @@ router.delete('/:id', planner, validate(schemas.idParam, 'params'), async (req, 
   const event = await loadVisible(req);
   if (!policy.canManageEvent(req.user, event)) throw forbidden('Only the organizer, a planner in a group it is shared with, or an admin can delete this event.');
   await events.softDelete(event.id);
+  live.eventChanged(event.id, event);
   res.status(204).end();
 });
 
@@ -97,6 +90,7 @@ router.get('/:id/attendees', validate(schemas.idParam, 'params'), async (req, re
 router.post('/:id/registration', validate(schemas.idParam, 'params'), async (req, res) => {
   const event = await loadVisible(req);
   await events.register(event.id, req.user.id);
+  live.eventChanged(event.id, event);
   res.status(201).json(serialize(req.user, await events.findById(req.user.id, event.id)));
 });
 
@@ -104,6 +98,7 @@ router.post('/:id/registration', validate(schemas.idParam, 'params'), async (req
 router.delete('/:id/registration', validate(schemas.idParam, 'params'), async (req, res) => {
   const event = await loadVisible(req);
   if (!(await events.unregister(event.id, req.user.id))) throw notFound('You are not registered for this event.');
+  live.eventChanged(event.id, event);
   res.json(serialize(req.user, await events.findById(req.user.id, event.id)));
 });
 

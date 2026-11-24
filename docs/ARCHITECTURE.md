@@ -27,6 +27,8 @@ The application follows a **Single Page Application (SPA)** pattern with a clear
 ## Communication
 The Client communicates with the Server via **RESTful API** calls. All data is exchanged in **JSON** format.
 
+Live catalogue updates (seats taken, events created, edited or deleted) flow one way, from server to browser, over **Server-Sent Events** (see [Live updates](#live-updates)). All writes still go through the REST API.
+
 ## Data Flow
 1. The React application initializes and fetches configuration from the API.
 2. React components request data from specific RESTful endpoints.
@@ -43,9 +45,11 @@ The Client communicates with the Server via **RESTful API** calls. All data is e
 ```
 client/                 React SPA (Vite root)
   src/components/ui/    Atomic components: Button, Field inputs, Modal, Feedback
-  src/components/       Composed components: NavBar, EventCard, AttendeesModal
-  src/context/          AuthContext (session + role), ToastContext
-  src/hooks/            useApi (GET + loading/error), useEventActions
+  src/components/       Composed components: NavBar, EventCard, AttendeesModal,
+                        EventEditorModal, ThemeToggle, LiveIndicator
+  src/context/          AuthContext (session + role), ToastContext, ThemeContext
+  src/hooks/            useApi (GET + loading/error), useEventActions, useLiveEvents
+  src/lib/              api (fetch wrapper), live (shared EventSource), liveMerge, theme
   src/pages/            Route pages
   src/styles/           app.scss (Tailwind directives, animations), _tokens.scss (palette)
 server/
@@ -54,6 +58,8 @@ server/
   config.js             Validated environment configuration
   db/                   Pool, schema.sql, seed script
   lib/policy.js         All access-control rules (pure functions)
+  lib/live.js           Live update hub: open streams and per-user fan-out
+  lib/serialize.js      Event response shape, shared by REST and the stream
   middleware/           authenticate, requireRole, validate (zod)
   repositories/         Parameterized SQL per resource
   routes/               REST handlers
@@ -71,6 +77,7 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | POST | `/api/auth/logout` | Public | Clears the session cookie (204) |
 | GET | `/api/auth/me` | Signed in | Current user, role and group ids |
 | PUT | `/api/auth/password` | Signed in | Revokes all other sessions (204) |
+| GET | `/api/events/stream` | Signed in | Server-Sent Events: live `event` and `remove` messages (see below) |
 | GET | `/api/events` | Signed in | Visible events only. Query: `type`, `q`, `past=true`, `manageable=true` |
 | GET | `/api/events/:id` | Signed in | 404 when hidden or deleted |
 | POST | `/api/events` | Planner, admin | 201 with `Location` header |
@@ -107,3 +114,38 @@ never derives permissions itself.
 - **Abuse:** login and register are rate limited per IP. `helmet` sets security headers.
 - **Concurrency:** seat reservations lock the event row (`SELECT ... FOR UPDATE`) so
   capacity cannot be exceeded by simultaneous sign-ups.
+
+### Live updates
+The catalogue receives changes in real time over Server-Sent Events, a one-way HTTP
+stream built into browsers (`EventSource`). SSE was chosen over GraphQL subscriptions
+because updates only flow from server to browser. It needs no second API layer or
+WebSocket server, and it reuses the session cookie and ACLs as they are.
+
+- **Flow:** after a join, leave, create, update or delete commits, the route calls
+  `live.eventChanged(id, before)`. The hub loads the event once, then sends each open
+  stream that user's view of it, serialized exactly as `GET /api/events/:id` would
+  return it (`permissions`, `isRegistered`, audience details only for managers).
+- **Messages:** `event` (the full event) goes to users who can see it. `remove`
+  (`{ id }`) goes to users who could see it before the change but cannot now (deleted,
+  or the audience changed). Everyone else gets nothing, so hidden events never leak,
+  not even as an id or a seat count.
+- **Sessions:** the stream uses a non-sliding session check, so an open tab does not
+  keep an idle session alive. Each stream closes after 5 minutes. The browser then
+  reconnects, which re-checks the session, role and group membership. A change to
+  someone's groups therefore reaches their stream within 5 minutes; REST requests
+  see it immediately. After a reconnect the client reloads its list to catch anything
+  it missed while disconnected.
+- **Client:** one shared `EventSource` (`client/src/lib/live.js`) for the whole app.
+  The catalogue merges messages into its list (`liveMerge.js`, applying the same
+  filters as the server). Manage Events reloads its table. Saves in the editor modal
+  are also published locally, so lists update even if the stream is down.
+- **Scaling:** the hub keeps open streams in the API process's memory. Running more
+  than one API process would need a shared channel (for example Redis pub/sub) to fan
+  each change out to every process.
+
+### Event editor modal
+Create and Edit open a modal over the current page rather than a separate page. Links
+pass `state={{ background: location }}`. `App.jsx` renders the page routes at that
+background location and the editor in a second route table, so the URL is still
+`/manage/new` or `/manage/:id/edit` and links can be shared or bookmarked. On a direct
+visit there is no background, so Manage Events renders underneath the modal.

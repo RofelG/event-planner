@@ -1,7 +1,7 @@
 import { useId } from 'react';
 
 const control =
-  'block w-full rounded-lg border bg-white px-3 text-sm text-ink-900 shadow-sm placeholder:text-ink-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50 disabled:text-ink-500';
+  'block w-full rounded-lg border bg-surface px-3 text-sm text-ink-900 shadow-sm placeholder:text-ink-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-ink-50 disabled:text-ink-500';
 const border = (error) => (error ? 'border-danger-400' : 'border-ink-300');
 
 /** Label + control + hint/error, wired together for screen readers. */

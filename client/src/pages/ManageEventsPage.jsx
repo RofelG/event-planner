@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { useEventActions } from '../hooks/useEventActions';
+import { useLiveEvents } from '../hooks/useLiveEvents';
 import { formatRange, hasEnded } from '../lib/format';
 import { AttendeesModal } from '../components/AttendeesModal';
 import { ConfirmDialog } from '../components/ui/Modal';
@@ -10,11 +11,14 @@ import { Alert, Badge, EmptyState, PageLoader } from '../components/ui/Feedback'
 import { Button } from '../components/ui/Button';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const linkButton = 'press inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700';
+const linkButton = 'press inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 dark:hover:bg-brand-600 dark:hover:brightness-90';
 
 /** Planner/admin dashboard: every event the caller is allowed to manage. */
 export function ManageEventsPage() {
   const { isAdmin } = useAuth();
+  const location = useLocation();
+  // Opens the editor as a modal over this page (see App.jsx).
+  const modal = { background: location };
   const [includePast, setIncludePast] = useState(false);
   const [attendeesFor, setAttendeesFor] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -23,6 +27,10 @@ export function ManageEventsPage() {
     onChange: () => {},
     onRemove: (id) => events.setData((list) => list.filter((e) => e.id !== id)),
   });
+
+  // Any live change (seats, edits by teammates, saves from the editor modal)
+  // reloads the table; it is filtered server-side by what the user can manage.
+  useLiveEvents(() => events.reload());
 
   const confirmDelete = async () => {
     await actions.remove(deleting);
@@ -38,7 +46,7 @@ export function ManageEventsPage() {
             {isAdmin ? 'As an admin you can edit or delete any event.' : 'Events you organize or that are shared with your groups. Create new events or update existing ones.'}
           </p>
         </div>
-        <Link to="/manage/new" className={linkButton}>Create event</Link>
+        <Link to="/manage/new" state={modal} className={linkButton}>Create event</Link>
       </div>
 
       <label className="mt-6 flex items-center gap-2 text-sm text-ink-700">
@@ -50,13 +58,13 @@ export function ManageEventsPage() {
         {events.error && <Alert title="Events could not be loaded">{events.error.message}</Alert>}
         {events.loading && !events.data && <PageLoader label="Loading your events" />}
         {events.data && events.data.length === 0 && (
-          <EmptyState title="You have no events yet" action={<Link to="/manage/new" className={linkButton}>Create your first event</Link>}>
+          <EmptyState title="You have no events yet" action={<Link to="/manage/new" state={modal} className={linkButton}>Create your first event</Link>}>
             Events you create appear here, where you can edit them, review attendees or delete them.
           </EmptyState>
         )}
 
         {events.data && events.data.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-card">
+          <div className="overflow-hidden rounded-xl border border-ink-200 bg-surface shadow-card">
             <table className="min-w-full divide-y divide-ink-200 text-sm">
               <thead className="bg-ink-50 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">
                 <tr>
@@ -94,7 +102,7 @@ export function ManageEventsPage() {
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         {e.permissions.edit && (
-                          <Link to={`/manage/${e.id}/edit`} className="press inline-flex h-8 items-center rounded-lg px-3 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900">Edit</Link>
+                          <Link to={`/manage/${e.id}/edit`} state={modal} className="press inline-flex h-8 items-center rounded-lg px-3 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900">Edit</Link>
                         )}
                         {e.permissions.delete && (
                           <Button size="sm" variant="danger-ghost" onClick={() => setDeleting(e)}>Delete</Button>

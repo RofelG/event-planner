@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { useEventActions } from '../hooks/useEventActions';
+import { useLiveEvents } from '../hooks/useLiveEvents';
+import { mergeLiveEvent } from '../lib/liveMerge';
+import { LiveIndicator } from '../components/LiveIndicator';
 import { EventCard, EventCardSkeleton } from '../components/EventCard';
 import { AttendeesModal } from '../components/AttendeesModal';
 import { ConfirmDialog } from '../components/ui/Modal';
@@ -20,11 +23,12 @@ function useDebounced(value, delay = 300) {
 
 const chip = (active) =>
   `press anim-select shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium ${
-    active ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50'
+    active ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-200 bg-surface text-ink-700 hover:border-ink-300 hover:bg-ink-50'
   }`;
 
 export function CataloguePage() {
   const { user, isPlanner } = useAuth();
+  const location = useLocation();
   const [typeId, setTypeId] = useState(null);
   const [search, setSearch] = useState('');
   const [onlyMine, setOnlyMine] = useState(false);
@@ -46,6 +50,13 @@ export function CataloguePage() {
   const drop = (id) => events.setData((list) => list.filter((e) => e.id !== id));
   const actions = useEventActions({ onChange: replace, onRemove: drop });
 
+  // Seats taken, edits, new and removed events arrive from the live stream.
+  useLiveEvents((message) => {
+    if (message.type === 'reconnected') events.reload();
+    else if (message.type === 'remove') events.setData((list) => list && list.filter((e) => e.id !== message.data.id));
+    else if (message.type === 'event') events.setData((list) => list && mergeLiveEvent(list, message.data, { typeId, q }));
+  });
+
   const shown = (events.data || []).filter((e) => !onlyMine || e.isRegistered);
   const filtered = Boolean(typeId || q || onlyMine);
 
@@ -58,11 +69,14 @@ export function CataloguePage() {
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-ink-900 sm:text-3xl">Event catalogue</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold text-ink-900 sm:text-3xl">Event catalogue</h1>
+            <LiveIndicator />
+          </div>
           <p className="mt-1 text-sm text-ink-500">Welcome, {user.first}. Find an event and reserve your seat.</p>
         </div>
         {isPlanner && (
-          <Link to="/manage/new" className="press inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 sm:hidden">
+          <Link to="/manage/new" state={{ background: location }} className="press inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 dark:hover:bg-brand-600 dark:hover:brightness-90 sm:hidden">
             Create event
           </Link>
         )}
@@ -76,7 +90,7 @@ export function CataloguePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, place or description"
-            className="h-10 w-full rounded-lg border border-ink-300 bg-white px-3 text-sm shadow-sm placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="h-10 w-full rounded-lg border border-ink-300 bg-surface px-3 text-sm shadow-sm placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           />
         </label>
         <div className="chip-row -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:min-w-0 lg:flex-1 lg:flex-wrap lg:px-0" role="group" aria-label="Filter by event type">

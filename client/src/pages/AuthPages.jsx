@@ -9,10 +9,10 @@ function AuthShell({ title, subtitle, children, footer }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-brand-50 to-ink-50 px-4 py-12">
       <div className="anim-drop mb-8 flex items-center gap-3">
-        <img src="/logo.svg" alt="" className="h-10 w-10" />
+        <img src="/logo.svg" alt="" className="h-10 w-10 dark:invert dark:hue-rotate-180" />
         <span className="text-xl font-semibold text-ink-900">Event Planner</span>
       </div>
-      <div className="anim-bounce-in w-full max-w-md rounded-2xl border border-ink-200 bg-white p-8 shadow-card" style={{ '--stagger': 1 }}>
+      <div className="anim-bounce-in w-full max-w-md rounded-2xl border border-ink-200 bg-surface p-8 shadow-card" style={{ '--stagger': 1 }}>
         <h1 className="text-2xl font-semibold text-ink-900">{title}</h1>
         <p className="mt-1 text-sm text-ink-500">{subtitle}</p>
         <div className="mt-6">{children}</div>

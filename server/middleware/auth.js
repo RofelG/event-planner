@@ -6,10 +6,19 @@ const { unauthorized, forbidden } = require('../lib/errors');
 const config = require('../config');
 
 /**
+ * Builds the session middleware. With { slide: false } the cookie is never
+ * renewed, for background requests (the live stream) that must not keep an
+ * idle session alive.
+ */
+function authenticateWith({ slide = true } = {}) {
+  return (req, res, next) => authenticate(req, res, next, slide);
+}
+
+/**
  * Requires a valid session cookie. On success sets req.user to
  * { id, first, last, email, role, groupIds } loaded fresh from the database.
  */
-async function authenticate(req, res, next) {
+async function authenticate(req, res, next, slide = true) {
   const token = req.cookies[COOKIE_NAME];
   if (!token) return next(unauthorized());
 
@@ -29,7 +38,7 @@ async function authenticate(req, res, next) {
   // Sliding session: once half the lifetime has passed, issue a fresh token so
   // active users are not signed out mid-task, while idle sessions still expire.
   const remaining = claims.exp - Math.floor(Date.now() / 1000);
-  if (remaining < config.tokenTtlSeconds / 2) setAuthCookie(res, user);
+  if (slide && remaining < config.tokenTtlSeconds / 2) setAuthCookie(res, user);
 
   req.user = users.toPrincipal(user);
   req.user.groupIds = await users.groupIdsFor(user.user_id);
@@ -45,4 +54,4 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { authenticate, requireRole };
+module.exports = { authenticate, authenticateWith, requireRole };
