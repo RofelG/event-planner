@@ -1,6 +1,8 @@
 node_modules/
+dist/
+coverage/
 .vscode/
-.log
+*.log
 .env
 db_connect.js
 .DS_Store
