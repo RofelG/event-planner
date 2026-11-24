@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { formatCost, formatRange } from '../lib/format';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Feedback';
@@ -18,6 +19,13 @@ function Detail({ label, children }) {
  */
 export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Skips the seat-count pop on first render; after that it plays whenever the
+  // count changes (a live update or the user joining or leaving).
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
   const { permissions: can } = event;
   const pct = Math.min(100, Math.round((event.attendeeCount / event.capacity) * 100));
   const seatsLeft = event.capacity - event.attendeeCount;
@@ -27,7 +35,7 @@ export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) 
   return (
     <article
       style={{ '--stagger': stagger }}
-      className="event-card flex flex-col rounded-xl border border-ink-200 bg-white shadow-card hover:shadow-pop"
+      className="event-card flex flex-col rounded-xl border border-ink-200 bg-surface shadow-card hover:shadow-pop"
     >
       <div className="flex flex-1 flex-col p-5">
         <div className="flex flex-wrap items-center gap-2">
@@ -49,7 +57,7 @@ export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) 
 
         <div className="mt-auto pt-5">
           <div className="mb-1.5 flex justify-between text-xs">
-            <span className="text-ink-600">{event.attendeeCount} of {event.capacity} seats taken</span>
+            <span key={event.attendeeCount} className={`text-ink-600 ${mounted.current ? 'anim-pop' : ''}`}>{event.attendeeCount} of {event.capacity} seats taken</span>
             <span className={event.isFull ? 'font-medium text-warning-700' : 'text-ink-500'}>
               {event.isFull ? 'Full' : `${seatsLeft} left`}
             </span>
@@ -75,7 +83,7 @@ export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) 
         {(can.edit || can.delete) && (
           <div className="ml-auto flex gap-1">
             {can.edit && (
-              <Button size="sm" variant="ghost" onClick={() => navigate(`/manage/${event.id}/edit`)}>Edit</Button>
+              <Button size="sm" variant="ghost" onClick={() => navigate(`/manage/${event.id}/edit`, { state: { background: location } })}>Edit</Button>
             )}
             {can.delete && (
               <Button size="sm" variant="danger-ghost" onClick={() => onDelete(event)}>Delete</Button>
@@ -89,7 +97,7 @@ export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) 
 
 export function EventCardSkeleton() {
   return (
-    <div className="rounded-xl border border-ink-200 bg-white p-5 shadow-card" aria-hidden="true">
+    <div className="rounded-xl border border-ink-200 bg-surface p-5 shadow-card" aria-hidden="true">
       <div className="skeleton h-5 w-20" />
       <div className="skeleton mt-4 h-6 w-3/4" />
       <div className="skeleton mt-2 h-4 w-full" />

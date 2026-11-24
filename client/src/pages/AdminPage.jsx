@@ -101,9 +101,9 @@ function UsersTab({ groups, reloadGroups }) {
         onChange={(e) => setFilter(e.target.value)}
         placeholder="Filter by name or email"
         aria-label="Filter users"
-        className="mb-4 h-10 w-full max-w-sm rounded-lg border border-ink-300 bg-white px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        className="mb-4 h-10 w-full max-w-sm rounded-lg border border-ink-300 bg-surface px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
       />
-      <div className="overflow-x-auto rounded-xl border border-ink-200 bg-white shadow-card">
+      <div className="overflow-x-auto rounded-xl border border-ink-200 bg-surface shadow-card">
         <table className="min-w-full divide-y divide-ink-200 text-sm">
           <thead className="bg-ink-50 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">
             <tr>
@@ -200,7 +200,7 @@ function GroupsTab({ groups }) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
-      <form onSubmit={create} className="h-fit space-y-4 rounded-xl border border-ink-200 bg-white p-5 shadow-card" noValidate>
+      <form onSubmit={create} className="h-fit space-y-4 rounded-xl border border-ink-200 bg-surface p-5 shadow-card" noValidate>
         <h2 className="text-base font-semibold text-ink-900">New group</h2>
         <TextInput label="Group name" value={name} onChange={(e) => setName(e.target.value)} error={error} maxLength={100} required />
         <Button type="submit" loading={busy} disabled={!name.trim()}>Create group</Button>
@@ -211,7 +211,7 @@ function GroupsTab({ groups }) {
         {groups.data.length === 0 ? (
           <EmptyState title="No groups yet">Create a group to start sharing restricted events with it.</EmptyState>
         ) : (
-          <ul className="divide-y divide-ink-100 rounded-xl border border-ink-200 bg-white shadow-card">
+          <ul className="divide-y divide-ink-100 rounded-xl border border-ink-200 bg-surface shadow-card">
             {groups.data.map((g, i) => (
               <li key={g.id} className="anim-row flex items-center gap-3 px-5 py-3" style={{ '--stagger': i }}>
                 {renaming?.id === g.id ? (

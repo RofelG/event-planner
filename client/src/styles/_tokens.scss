@@ -14,7 +14,29 @@ $palette: (
               500: 247 144 9, 600: 220 104 3, 700: 181 71 8, 800: 147 55 13, 900: 122 46 14),
 );
 
+// Dark theme. Same token names, so every utility (bg-ink-50, text-brand-700)
+// adapts without per-component changes. The light ends of each scale (50-300,
+// used for tints, borders and fills) become dark, and the dark ends (700-900,
+// used for text) become light. 400-600 stay mid-tone because they are used as
+// solid fills under white text.
+$palette-dark: (
+  'brand': (50: 26 30 66, 100: 33 39 88, 200: 52 60 132, 300: 74 84 180, 400: 110 124 240,
+            500: 120 134 247, 600: 88 99 235, 700: 165 178 252, 800: 196 207 254, 900: 225 232 255),
+  'ink': (50: 10 13 20, 100: 31 37 50, 200: 44 51 66, 300: 64 72 88, 400: 100 109 125,
+          500: 141 150 165, 600: 170 178 192, 700: 200 206 216, 800: 226 230 236, 900: 243 245 248),
+  'success': (50: 8 38 26, 100: 10 52 35, 200: 16 80 54, 300: 30 120 80, 400: 50 190 120,
+              500: 18 183 106, 600: 3 152 85, 700: 110 225 165, 800: 150 235 190, 900: 200 245 220),
+  'danger': (50: 52 18 16, 100: 70 22 19, 200: 110 34 28, 300: 160 50 42, 400: 249 112 102,
+             500: 240 68 56, 600: 217 45 32, 700: 252 150 142, 800: 254 190 185, 900: 254 220 217),
+  'warning': (50: 50 34 8, 100: 70 46 10, 200: 110 72 14, 300: 160 105 20, 400: 253 176 34,
+              500: 247 144 9, 600: 220 104 3, 700: 253 196 100, 800: 254 215 150, 900: 255 235 200),
+);
+
 :root {
+  // Cards, menus, dialogs and the nav sit on this; the page itself is ink-50.
+  --color-surface: 255 255 255;
+  color-scheme: light;
+
   @each $name, $steps in $palette {
     @each $step, $rgb in $steps {
       --color-#{$name}-#{$step}: #{$rgb};
@@ -25,4 +47,17 @@ $palette: (
   --space-unit: 4px;
   --radius-card: 12px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+// The theme class is set on <html> before first paint by public/theme-init.js.
+:root.dark {
+  --color-surface: 21 26 37;
+  // Native controls (date pickers, scrollbars, checkboxes) follow the theme.
+  color-scheme: dark;
+
+  @each $name, $steps in $palette-dark {
+    @each $step, $rgb in $steps {
+      --color-#{$name}-#{$step}: #{$rgb};
+    }
+  }
 }

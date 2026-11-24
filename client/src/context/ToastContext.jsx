@@ -4,9 +4,9 @@ const ToastContext = createContext(null);
 let nextId = 1;
 
 const tones = {
-  success: 'border-success-200 bg-white text-ink-800 [&>span]:bg-success-500',
-  error: 'border-danger-200 bg-white text-ink-800 [&>span]:bg-danger-500',
-  info: 'border-ink-200 bg-white text-ink-800 [&>span]:bg-brand-500',
+  success: 'border-success-200 bg-surface text-ink-800 [&>span]:bg-success-500',
+  error: 'border-danger-200 bg-surface text-ink-800 [&>span]:bg-danger-500',
+  info: 'border-ink-200 bg-surface text-ink-800 [&>span]:bg-brand-500',
 };
 
 /** Short-lived confirmation messages ("You joined the event"). */

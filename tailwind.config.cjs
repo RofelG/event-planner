@@ -13,9 +13,13 @@ const scale = (name) =>
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [path.join(__dirname, 'client/index.html'), path.join(__dirname, 'client/src/**/*.{js,jsx}')],
+  // The theme toggle puts `dark` on <html>; dark: utilities are for the few
+  // cases the token swap in _tokens.scss cannot cover on its own.
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
         brand: scale('brand'),
         ink: scale('ink'),
         success: scale('success'),
