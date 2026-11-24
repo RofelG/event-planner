@@ -8,16 +8,16 @@ import { Alert, PageLoader } from '../components/ui/Feedback';
 function AuthShell({ title, subtitle, children, footer }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-brand-50 to-ink-50 px-4 py-12">
-      <div className="mb-8 flex items-center gap-3">
+      <div className="anim-drop mb-8 flex items-center gap-3">
         <img src="/logo.svg" alt="" className="h-10 w-10" />
         <span className="text-xl font-semibold text-ink-900">Event Planner</span>
       </div>
-      <div className="w-full max-w-md rounded-2xl border border-ink-200 bg-white p-8 shadow-card">
+      <div className="anim-bounce-in w-full max-w-md rounded-2xl border border-ink-200 bg-white p-8 shadow-card" style={{ '--stagger': 1 }}>
         <h1 className="text-2xl font-semibold text-ink-900">{title}</h1>
         <p className="mt-1 text-sm text-ink-500">{subtitle}</p>
         <div className="mt-6">{children}</div>
       </div>
-      <p className="mt-6 text-sm text-ink-600">{footer}</p>
+      <p className="anim-bounce-in mt-6 text-sm text-ink-600" style={{ '--stagger': 3 }}>{footer}</p>
     </div>
   );
 }

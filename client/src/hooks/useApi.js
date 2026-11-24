@@ -7,6 +7,9 @@ import { api } from '../lib/api';
  */
 export function useApi(path) {
   const [data, setData] = useState(null);
+  // The path the current data was loaded from. Lets callers tell a fresh result
+  // (new filter) apart from an in-place update (setData) or a reload.
+  const [dataPath, setDataPath] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(Boolean(path));
   const controller = useRef(null);
@@ -20,7 +23,10 @@ export function useApi(path) {
     setError(null);
     try {
       const result = await api(path, { signal: ctrl.signal });
-      if (!ctrl.signal.aborted) setData(result);
+      if (!ctrl.signal.aborted) {
+        setData(result);
+        setDataPath(path);
+      }
     } catch (err) {
       if (err.name !== 'AbortError') setError(err);
     } finally {
@@ -33,5 +39,5 @@ export function useApi(path) {
     return () => controller.current?.abort();
   }, [load]);
 
-  return { data, setData, error, loading, reload: load };
+  return { data, setData, dataPath, error, loading, reload: load };
 }

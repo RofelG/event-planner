@@ -10,7 +10,7 @@ import { Alert, Badge, EmptyState, PageLoader } from '../components/ui/Feedback'
 import { Button } from '../components/ui/Button';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const linkButton = 'inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700';
+const linkButton = 'press inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700';
 
 /** Planner/admin dashboard: every event the caller is allowed to manage. */
 export function ManageEventsPage() {
@@ -68,8 +68,8 @@ export function ManageEventsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100">
-                {events.data.map((e) => (
-                  <tr key={e.id} className={hasEnded(e) ? 'bg-ink-50/60 text-ink-500' : ''}>
+                {events.data.map((e, i) => (
+                  <tr key={e.id} style={{ '--stagger': i }} className={`anim-row ${hasEnded(e) ? 'bg-ink-50/60 text-ink-500' : ''}`}>
                     <td className="px-4 py-3">
                       <p className="font-medium text-ink-900">{e.name}</p>
                       <p className="text-xs text-ink-500">{e.type.name} - {e.location}{isAdmin ? ` - Host: ${e.organizer.name}` : ''}</p>
@@ -94,7 +94,7 @@ export function ManageEventsPage() {
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         {e.permissions.edit && (
-                          <Link to={`/manage/${e.id}/edit`} className="inline-flex h-8 items-center rounded-lg px-3 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900">Edit</Link>
+                          <Link to={`/manage/${e.id}/edit`} className="press inline-flex h-8 items-center rounded-lg px-3 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900">Edit</Link>
                         )}
                         {e.permissions.delete && (
                           <Button size="sm" variant="danger-ghost" onClick={() => setDeleting(e)}>Delete</Button>

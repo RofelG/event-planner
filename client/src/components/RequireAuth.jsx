@@ -15,7 +15,10 @@ export function RequireAuth() {
     <div className="min-h-screen">
       <NavBar />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <Outlet />
+        {/* Keyed by path so each route change replays the page entrance. */}
+        <div key={location.pathname} className="anim-page">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

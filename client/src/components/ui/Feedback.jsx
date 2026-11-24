@@ -11,7 +11,7 @@ const alertTones = {
 
 export function Alert({ tone = 'error', title, children, action }) {
   return (
-    <div role={tone === 'error' ? 'alert' : 'status'} className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${alertTones[tone]}`}>
+    <div role={tone === 'error' ? 'alert' : 'status'} className={`anim-drop flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${alertTones[tone]}`}>
       <div className="flex-1">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={title ? 'mt-0.5' : ''}>{children}</div>}
@@ -23,7 +23,7 @@ export function Alert({ tone = 'error', title, children, action }) {
 
 export function EmptyState({ title, children, action }) {
   return (
-    <div className="rounded-xl border border-dashed border-ink-300 bg-white px-6 py-12 text-center">
+    <div className="anim-bounce-in rounded-xl border border-dashed border-ink-300 bg-white px-6 py-12 text-center">
       <p className="text-base font-semibold text-ink-900">{title}</p>
       {children && <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">{children}</p>}
       {action && <div className="mt-5">{action}</div>}

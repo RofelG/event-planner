@@ -114,8 +114,8 @@ function UsersTab({ groups, reloadGroups }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-ink-100">
-            {shown.map((p) => (
-              <tr key={p.id}>
+            {shown.map((p, i) => (
+              <tr key={p.id} className="anim-row" style={{ '--stagger': i }}>
                 <td className="px-4 py-3">
                   <p className="font-medium text-ink-900">{p.name}{p.id === user.id && <span className="ml-2 text-xs font-normal text-ink-500">(you)</span>}</p>
                   <p className="text-xs text-ink-500">{p.email}</p>
@@ -212,8 +212,8 @@ function GroupsTab({ groups }) {
           <EmptyState title="No groups yet">Create a group to start sharing restricted events with it.</EmptyState>
         ) : (
           <ul className="divide-y divide-ink-100 rounded-xl border border-ink-200 bg-white shadow-card">
-            {groups.data.map((g) => (
-              <li key={g.id} className="flex items-center gap-3 px-5 py-3">
+            {groups.data.map((g, i) => (
+              <li key={g.id} className="anim-row flex items-center gap-3 px-5 py-3" style={{ '--stagger': i }}>
                 {renaming?.id === g.id ? (
                   <form onSubmit={rename} className="flex flex-1 items-center gap-2">
                     <input
@@ -255,7 +255,7 @@ export function AdminPage() {
   const groups = useApi('/groups');
 
   const tabClass = (name) =>
-    `border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
+    `anim-select border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
       tab === name ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-500 hover:text-ink-800'
     }`;
 
@@ -269,7 +269,7 @@ export function AdminPage() {
         <button type="button" role="tab" aria-selected={tab === 'groups'} className={tabClass('groups')} onClick={() => setTab('groups')}>Groups</button>
       </div>
 
-      <div className="mt-6" role="tabpanel">
+      <div key={tab} className="anim-page mt-6" role="tabpanel">
         {groups.error && <Alert>{groups.error.message}</Alert>}
         {!groups.data && !groups.error && <PageLoader />}
         {groups.data && tab === 'users' && <UsersTab groups={groups.data} reloadGroups={groups.reload} />}

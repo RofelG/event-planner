@@ -20,7 +20,7 @@ export function Button({ variant = 'primary', size = 'md', loading = false, clas
       type="button"
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg font-medium transition-colors disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`press inline-flex items-center justify-center whitespace-nowrap rounded-lg font-medium disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >
       {loading && <Spinner className="h-4 w-4" />}
