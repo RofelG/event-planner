@@ -9,7 +9,7 @@ and manage events, and can restrict an event to specific groups or invited peopl
 
 ## Quick start
 
-Requires Node.js 20+ and Docker Desktop.
+Requires Node.js 20.19+ or 22.12+ (CI runs on Node 24) and Docker Desktop.
 
 ```powershell
 Copy-Item .env.example .env
