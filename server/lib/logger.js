@@ -18,6 +18,9 @@ const redact = {
     'password',
     'current',
     'confirm',
+    'token', // password reset token
+    '*.token',
+    'req.body.token',
     '*.password',
     '*.current',
     '*.confirm',

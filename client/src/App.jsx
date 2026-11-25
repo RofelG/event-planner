@@ -1,6 +1,6 @@
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { RequireAuth, RequireRole } from './components/RequireAuth';
-import { LoginPage, RegisterPage } from './pages/AuthPages';
+import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from './pages/AuthPages';
 import { CataloguePage } from './pages/CataloguePage';
 import { ManageEventsPage } from './pages/ManageEventsPage';
 import { EventEditorRoute } from './components/EventEditorModal';
@@ -38,6 +38,8 @@ export function App() {
       <Routes location={background || location}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route element={<RequireAuth />}>
           <Route index element={<CataloguePage />} />
           <Route path="manage" element={managePage} />
