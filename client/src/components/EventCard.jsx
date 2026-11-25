@@ -78,6 +78,16 @@ export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) 
         {!can.join && !can.leave && event.isFull && !event.isRegistered && (
           <span className="text-sm text-ink-500">No seats available</span>
         )}
+        {event.isRegistered && (
+          // Plain link: the browser sends the session cookie and saves the file.
+          <a
+            href={`/api/events/${event.id}/calendar.ics`}
+            download
+            className="press inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+          >
+            Add to calendar
+          </a>
+        )}
         <Button size="sm" variant="ghost" onClick={() => onAttendees(event)}>View attendees</Button>
 
         {(can.edit || can.delete) && (
