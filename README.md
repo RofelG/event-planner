@@ -100,3 +100,9 @@ Set `DEMO_MODE=true` in `.env` to run the app as a public showcase:
 Demo mode only adds rows; it never changes existing users or events. It does add about
 160 simulated users, so point `DB_DB` at a separate database for a demo. Guests are
 limited to 10 new names per hour per IP address and 5 new events per hour.
+
+## Dependency updates
+
+Dependabot checks npm packages and GitHub Actions every Monday, configured in
+`.github/dependabot.yml`. Minor and patch npm updates are grouped into one pull request,
+while major version updates arrive as separate pull requests so each can be reviewed on its own.
