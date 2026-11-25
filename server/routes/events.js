@@ -10,6 +10,7 @@ const live = require('../lib/live');
 const { serializeEvent: serialize } = require('../lib/serialize');
 const { validate } = require('../middleware/validate');
 const { requireUser } = require('../middleware/auth');
+const ical = require('../lib/ical');
 const { encodeCursor, positionOf } = require('../lib/cursor');
 const config = require('../config');
 const logger = require('../lib/logger');
@@ -105,6 +106,15 @@ router.get('/', validate(schemas.eventQuery, 'query'), async (req, res) => {
 // GET /api/events/:id
 router.get('/:id', validate(schemas.idParam, 'params'), async (req, res) => {
   res.json(serialize(req.user, await loadVisible(req)));
+});
+
+// GET /api/events/:id/calendar.ics - single-event iCalendar download.
+router.get('/:id/calendar.ics', validate(schemas.idParam, 'params'), async (req, res) => {
+  const event = await loadVisible(req);
+  res
+    .type('text/calendar; charset=utf-8')
+    .set('Content-Disposition', `attachment; filename="${ical.safeFilename(event.name)}"`)
+    .send(ical.buildEventCalendar(event));
 });
 
 // POST /api/events - planners and admins; in demo mode, any signed-in user.
