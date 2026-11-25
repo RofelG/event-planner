@@ -10,6 +10,7 @@
  */
 const config = require('../config');
 const live = require('../lib/live');
+const logger = require('../lib/logger');
 const events = require('../repositories/events');
 const { query } = require('../db/pool');
 const { ensureShowcase } = require('./showcase');
@@ -73,7 +74,7 @@ async function tick() {
     const actions = 1 + Math.floor(Math.random() * 4);
     for (let i = 0; i < actions; i += 1) await simulateOne();
   } catch (err) {
-    console.error('Demo simulation failed', err);
+    logger.error({ err }, 'Demo simulation failed');
   }
   tickTimer = setTimeout(tick, TICK_MIN_MS + Math.random() * (TICK_MAX_MS - TICK_MIN_MS));
 }
@@ -110,7 +111,7 @@ async function maintain() {
     for (const id of created) await live.eventChanged(id);
     await refreshEvents();
   } catch (err) {
-    console.error('Demo maintenance failed', err);
+    logger.error({ err }, 'Demo maintenance failed');
   }
 }
 
@@ -121,9 +122,14 @@ async function start() {
   await cleanup();
   maintenanceTimer = setInterval(maintain, MAINTENANCE_MS);
   if (config.demo.simulate) tick();
-  console.log(
-    `Demo mode: ${state.eventIds.length} showcase events, ${state.botIds.length} simulated attendees` +
-      `${config.demo.simulate ? '' : ' (simulation off)'}; guest events expire after ${config.demo.ttlHours}h.`
+  logger.info(
+    {
+      showcaseEvents: state.eventIds.length,
+      simulatedAttendees: state.botIds.length,
+      simulate: config.demo.simulate,
+      ttlHours: config.demo.ttlHours,
+    },
+    'Demo mode started'
   );
 }
 

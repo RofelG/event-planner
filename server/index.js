@@ -5,11 +5,12 @@ const app = require('./app');
 const { pool } = require('./db/pool');
 const live = require('./lib/live');
 const demo = require('./demo');
+const logger = require('./lib/logger');
 
 const server = app.listen(config.port, () => {
-  console.log(`API listening on http://localhost:${config.port} (${config.env})`);
+  logger.info({ port: config.port, env: config.env }, 'API listening');
   if (config.demo.enabled) {
-    demo.start().catch((err) => console.error('Demo mode failed to start', err));
+    demo.start().catch((err) => logger.error({ err }, 'Demo mode failed to start'));
   }
 });
 
