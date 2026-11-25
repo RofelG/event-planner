@@ -1,0 +1,12 @@
+# DOMAIN comes from .env.production via docker-compose.prod.yml. Caddy gets and
+# renews the TLS certificate for it automatically (ports 80 and 443 must be open).
+{$DOMAIN} {
+	# Never compress the live-update stream: compression buffers events.
+	@compressible not path /api/events/stream
+	encode @compressible zstd gzip
+
+	reverse_proxy app:3001 {
+		# -1 flushes every write immediately, so Server-Sent Events arrive at once.
+		flush_interval -1
+	}
+}

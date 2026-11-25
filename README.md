@@ -101,6 +101,11 @@ Demo mode only adds rows; it never changes existing users or events. It does add
 160 simulated users, so point `DB_DB` at a separate database for a demo. Guests are
 limited to 10 new names per hour per IP address and 5 new events per hour.
 
+## Deployment
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) to run the app on a VPS with Docker
+Compose and automatic HTTPS.
+
 ## Dependency updates
 
 Dependabot checks npm packages and GitHub Actions every Monday, configured in
