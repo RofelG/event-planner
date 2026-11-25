@@ -81,6 +81,15 @@ export function CataloguePage() {
   const shown = events.items || [];
   const filtered = Boolean(typeId || q || onlyMine);
 
+  let resultStatus = '';
+  if (events.error) resultStatus = 'Events could not be loaded.';
+  else if (events.loading) resultStatus = 'Loading events.';
+  else if (events.loadingMore) resultStatus = 'Loading more events.';
+  else if (events.items && shown.length === 0) resultStatus = filtered ? 'No events match your filters.' : 'No upcoming events yet.';
+  else if (shown.length) {
+    resultStatus = `Showing ${shown.length} event${shown.length === 1 ? '' : 's'}${events.hasMore ? '. Scroll for more.' : '.'}`;
+  }
+
   const confirmDelete = async () => {
     await actions.remove(deleting);
     setDeleting(null);
@@ -137,7 +146,12 @@ export function CataloguePage() {
         )}
       </div>
 
-      <section className="mt-6" aria-live="polite" aria-busy={events.loading}>
+      {/* What screen readers announce: changes to the result set only. The
+          cards are not a live region, because seat counts change several
+          times a second in demo mode and each change would be read out. */}
+      <p role="status" className="sr-only">{resultStatus}</p>
+
+      <section className="mt-6" aria-busy={events.loading}>
         {events.error && (
           <Alert title="Events could not be loaded" action={<Button size="sm" variant="secondary" onClick={events.reload}>Try again</Button>}>
             {events.error.message}
