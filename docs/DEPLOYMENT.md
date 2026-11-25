@@ -80,6 +80,25 @@ gunzip -c backup.sql.gz | docker compose -f docker-compose.prod.yml exec -T db s
   'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"'
 ```
 
+## Email (password reset)
+
+Password reset sends email through any SMTP service (your provider's relay, SES, etc.).
+Set these in `.env` (see `.env.production.example`):
+
+| Variable | Meaning |
+| --- | --- |
+| `APP_URL` | Public site address, e.g. `https://events.example.com`. Reset links point here. |
+| `SMTP_HOST`, `SMTP_PORT` | Provider's SMTP server. Usually 587 (STARTTLS) or 465 (implicit TLS). |
+| `SMTP_SECURE` | `true` for port 465, `false` for 587. |
+| `SMTP_USER`, `SMTP_PASS` | SMTP credentials. |
+| `MAIL_FROM` | Sender, e.g. `Event Planner <no-reply@events.example.com>`. Must be allowed by the provider. |
+
+Without `SMTP_HOST` the app still runs but sends nothing, so users cannot reset passwords;
+in production the reset link is deliberately not written to the logs. Send errors are
+logged (`password reset email failed`) without telling the requester. Set up SPF and DKIM
+for the sender domain so the mail is not filed as spam. After editing `.env`, run
+`docker compose -f docker-compose.prod.yml up -d` to recreate the app container.
+
 ## Demo mode
 
 Demo mode adds about 160 simulated users, so give it its own database rather than

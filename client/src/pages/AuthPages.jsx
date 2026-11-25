@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { TextInput } from '../components/ui/Field';
@@ -69,12 +70,98 @@ export function LoginPage() {
       footer={<>New here? <Link to="/register" className="font-medium text-brand-700 hover:underline">Create an account</Link></>}
     >
       <form onSubmit={submit} className="space-y-4" noValidate>
+        {location.state?.notice && <Alert tone="success">{location.state.notice}</Alert>}
         {expired && !message && <Alert tone="info">Your session expired. Please sign in again.</Alert>}
         {message && <Alert>{message}</Alert>}
         <TextInput label="Email" type="email" autoComplete="email" value={form.email} onChange={set('email')} error={errors.email} required autoFocus />
         <TextInput label="Password" type="password" autoComplete="current-password" value={form.password} onChange={set('password')} error={errors.password} required />
+        <div className="text-right text-sm">
+          <Link to="/forgot-password" className="font-medium text-brand-700 hover:underline">Forgot your password?</Link>
+        </div>
         <Button type="submit" size="lg" className="w-full" loading={busy}>Sign in</Button>
       </form>
+    </AuthShell>
+  );
+}
+
+export function ForgotPasswordPage() {
+  const { form, set, errors, message, busy, run } = useForm({ email: '' });
+  const [sent, setSent] = useState(false);
+
+  const submit = (e) => {
+    e.preventDefault();
+    run(async () => {
+      await api('/auth/forgot', { method: 'POST', body: { email: form.email } });
+      setSent(true);
+    });
+  };
+
+  return (
+    <AuthShell
+      title="Forgot your password?"
+      subtitle="Enter your email and we will send you a link to choose a new one."
+      footer={<>Remembered it? <Link to="/login" className="font-medium text-brand-700 hover:underline">Sign in</Link></>}
+    >
+      {sent ? (
+        // Same wording whether or not the account exists.
+        <Alert tone="success">If an account exists for that email, a reset link is on its way. The link works for 30 minutes.</Alert>
+      ) : (
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          {message && <Alert>{message}</Alert>}
+          <TextInput label="Email" type="email" autoComplete="email" value={form.email} onChange={set('email')} error={errors.email} required autoFocus />
+          <Button type="submit" size="lg" className="w-full" loading={busy}>Send reset link</Button>
+        </form>
+      )}
+    </AuthShell>
+  );
+}
+
+export function ResetPasswordPage() {
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const token = params.get('token') || '';
+  const { form, set, errors, message, busy, run } = useForm({ password: '', confirm: '' });
+
+  const submit = (e) => {
+    e.preventDefault();
+    run(async () => {
+      await api('/auth/reset', { method: 'POST', body: { token, password: form.password, confirm: form.confirm } });
+      navigate('/login', { replace: true, state: { notice: 'Your password was changed. Sign in with your new password.' } });
+    });
+  };
+
+  return (
+    <AuthShell
+      title="Choose a new password"
+      subtitle="Pick a new password for your account. You will be signed out everywhere."
+      footer={<Link to="/login" className="font-medium text-brand-700 hover:underline">Back to sign in</Link>}
+    >
+      {!token ? (
+        <Alert>
+          This reset link is incomplete. <Link to="/forgot-password" className="font-medium underline">Request a new one</Link>.
+        </Alert>
+      ) : (
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          {message && (
+            <Alert>
+              {message} <Link to="/forgot-password" className="font-medium underline">Request a new link</Link>
+            </Alert>
+          )}
+          <TextInput
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            value={form.password}
+            onChange={set('password')}
+            error={errors.password}
+            hint="At least 10 characters, including a letter and a number."
+            required
+            autoFocus
+          />
+          <TextInput label="Confirm new password" type="password" autoComplete="new-password" value={form.confirm} onChange={set('confirm')} error={errors.confirm} required />
+          <Button type="submit" size="lg" className="w-full" loading={busy}>Change password</Button>
+        </form>
+      )}
     </AuthShell>
   );
 }

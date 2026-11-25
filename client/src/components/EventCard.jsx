@@ -76,8 +76,33 @@ export function EventCard({ event, actions, onAttendees, onDelete, onHide, index
         {can.leave && (
           <Button size="sm" variant="secondary" onClick={() => actions.leave(event)} loading={actions.isPending('leave', event.id)}>Leave event</Button>
         )}
-        {!can.join && !can.leave && event.isFull && !event.isRegistered && (
+        {can.joinWaitlist && (
+          <Button size="sm" onClick={() => actions.joinWaitlist(event)} loading={actions.isPending('joinWaitlist', event.id)}>Join waitlist</Button>
+        )}
+        {can.leaveWaitlist && (
+          <>
+            {/* Keyed by position so the pop replays when the user moves up. */}
+            <span key={event.waitlistPosition} className="anim-pop"><Badge tone="warning">You are number {event.waitlistPosition} on the waitlist</Badge></span>
+            <Button size="sm" variant="secondary" onClick={() => actions.leaveWaitlist(event)} loading={actions.isPending('leaveWaitlist', event.id)}>Leave waitlist</Button>
+          </>
+        )}
+        {!can.join && !can.leave && !can.joinWaitlist && !can.leaveWaitlist && event.isFull && !event.isRegistered && (
           <span className="text-sm text-ink-500">No seats available</span>
+        )}
+        {event.waitlistCount > 0 && !event.isRegistered && (
+          <span key={event.waitlistCount} className={`text-sm text-ink-500 ${mounted.current ? 'anim-pop' : ''}`}>
+            {event.waitlistCount} waiting
+          </span>
+        )}
+        {event.isRegistered && (
+          // Plain link: the browser sends the session cookie and saves the file.
+          <a
+            href={`/api/events/${event.id}/calendar.ics`}
+            download
+            className="press inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+          >
+            Add to calendar
+          </a>
         )}
         <Button size="sm" variant="ghost" onClick={() => onAttendees(event)}>View attendees</Button>
 

@@ -105,7 +105,7 @@ const listed = async (who, q) => (await api(who).get(`/events?limit=50&q=${q}`).
 beforeAll(async () => {
   await applySchema();
   await query('SET FOREIGN_KEY_CHECKS = 0');
-  for (const t of ['registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
+  for (const t of ['password_reset', 'waitlist', 'registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
     await query(`TRUNCATE TABLE ${t}`);
   }
   await query('SET FOREIGN_KEY_CHECKS = 1');
@@ -212,6 +212,17 @@ describe('REST API', () => {
     await api('admin').get(`/events/${eventId}/attendees`).expect(200);
     // Even an admin cannot sign up for a hidden event.
     await api('admin').post(`/events/${eventId}/registration`).expect(409);
+  });
+
+  test('nobody can join the waitlist of a hidden full event, not even an admin', async () => {
+    const full = (await api('planner').post('/events', eventBody({ name: 'Hidden and full', capacity: 1 })).expect(201)).body;
+    await api('member').post(`/events/${full.id}/registration`).expect(201);
+    await api('admin').post(`/events/${full.id}/hide`).expect(200);
+
+    const seen = (await api('admin').get(`/events/${full.id}`).expect(200)).body;
+    expect(seen.permissions).toMatchObject({ joinWaitlist: false });
+    await api('admin').post(`/events/${full.id}/waitlist`).expect(409);
+    await api('outsider').post(`/events/${full.id}/waitlist`).expect(404);
   });
 
   test('hiding twice is harmless; non-admins never see the hidden flag', async () => {

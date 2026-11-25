@@ -15,7 +15,8 @@ const env = existsSync(envFile) ? parse(readFileSync(envFile)) : {};
 
 export default defineConfig(() => {
   // API_PORT only: dev tooling may set PORT for the Vite process itself.
-  const apiPort = env.API_PORT || 3001;
+  // A real environment variable wins, so the e2e run can point at its own API.
+  const apiPort = process.env.API_PORT || env.API_PORT || 3001;
 
   return {
     root,

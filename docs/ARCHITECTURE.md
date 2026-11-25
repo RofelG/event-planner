@@ -79,6 +79,7 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | POST | `/api/auth/logout` | Public | Clears the session cookie (204) |
 | GET | `/api/auth/me` | Signed in | Current user, role and group ids |
 | PUT | `/api/auth/password` | Signed in | Revokes all other sessions (204) |
+| PUT | `/api/auth/settings` | Signed in (guests too, not visitors) | `{ hideName }`; returns the updated user |
 | GET | `/api/demo` | Public | `{ enabled, ttlHours }`, so the client can adapt to demo mode |
 | POST | `/api/demo/guest` | Public, demo mode only | `{ name }`: creates a guest and signs them in (201); 404 outside demo mode |
 | GET | `/api/events/stream` | Signed in (or visitor in demo) | Server-Sent Events: live `event`, `remove` and `ping` messages (see below) |
@@ -89,9 +90,12 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | DELETE | `/api/events/:id` | Organizer, planner in a shared group, admin | Soft delete (204) |
 | POST | `/api/events/:id/hide` | Admin | Moderation: hide the event from everyone but admins; returns the event with `hidden: true` |
 | DELETE | `/api/events/:id/hide` | Admin | Unhide; visibility rules apply again as before |
-| GET | `/api/events/:id/attendees` | Can view event | Names only |
+| GET | `/api/events/:id/calendar.ics` | Can view event | Single-event iCalendar download (`text/calendar`, attachment); 404 when hidden or missing |
+| GET | `/api/events/:id/attendees` | Can view event | Names only; users with `hideName` appear as "Private attendee" (`private: true`, no real id) unless the viewer manages the event or is that user |
 | POST | `/api/events/:id/registration` | Can view event | Join (201); 409 when full or already joined |
-| DELETE | `/api/events/:id/registration` | Can view event | Leave |
+| DELETE | `/api/events/:id/registration` | Can view event | Leave; the first person on the waitlist takes the seat |
+| POST | `/api/events/:id/waitlist` | Can view event | Join the waitlist (201); 409 when seats are free, registered, already waiting or ended |
+| DELETE | `/api/events/:id/waitlist` | Can view event | Leave the waitlist; 404 when not on it |
 | GET | `/api/types` | Signed in (or visitor in demo) | Event types |
 | GET | `/api/users` | Planner, admin | Planners: names; admins: email, role, status, groups |
 | PUT | `/api/users/:id` | Admin | `role`, `active`, `groupIds` |
@@ -121,11 +125,20 @@ merges live updates only into the part of the list already loaded.
   request, so changes apply immediately. All rules live in `policy.js`. Events a user
   cannot see return 404 from every endpoint (detail, attendees, registration).
   An event hidden by an admin (`event_hidden_at`) is visible to admins only, not even its organizer, and is treated as missing for everyone else, including the live stream.
+- **Privacy:** a user can hide their name in attendee lists (`user_hide_name`). The decision is
+  `canSeeAttendeeName` in `policy.js`; hidden entries carry no user id, only a key that is
+  unique within one response, so they cannot be correlated across events.
 - **Input:** every body, query and path parameter is validated with zod; unknown fields
   are dropped, which prevents mass assignment (for example a client setting its own role).
   All SQL is parameterized.
 - **CSRF:** SameSite=Strict cookies, plus the API rejects non-JSON write requests (415).
-- **Abuse:** login and register are rate limited per IP. `helmet` sets security headers.
+- **Password reset:** `POST /api/auth/forgot` always answers 202 and does its lookup and
+  email after responding, so neither the body nor the timing reveals whether an account
+  exists. Tokens are 32 random bytes, valid 30 minutes, single use; only their SHA-256 hash
+  is stored (`password_reset`). A new request invalidates earlier ones. Redeeming a token
+  sets the password through the same path as a password change, so all sessions are signed
+  out. Demo guests and deactivated accounts get no email.
+- **Abuse:** login, register, reset and forgot-password are rate limited per IP. `helmet` sets security headers.
 - **Concurrency:** seat reservations lock the event row (`SELECT ... FOR UPDATE`) so
   capacity cannot be exceeded by simultaneous sign-ups.
 
@@ -139,6 +152,23 @@ To change the schema, add the next numbered file; never edit one that has shippe
 migrations existed. MySQL DDL auto-commits, so a migration that fails halfway cannot be
 rolled back and its version is not recorded: fix the leftovers by hand, then re-run.
 Keep migrations small, one change each.
+
+### Waitlist
+Full events have a first-come, first-served waitlist (`waitlist` table, `created_at`
+with millisecond precision, ties broken by user id).
+
+- **Joining:** only for a full, not-ended event the user can see and has no seat in
+  (`policy.canJoinWaitlist`); the repository re-checks under the event row lock.
+  Registering removes the user from that event's waitlist.
+- **Promotion:** `promoteFromWaitlist` in `repositories/events.js` fills free seats in
+  order, inside the same transaction and event-row lock (`SELECT ... FOR UPDATE`) that
+  freed them. It runs after `unregister`, after an `update` that raises capacity, and
+  after `removeUsers` (demo guest cleanup), so concurrent leaves cannot over-fill an
+  event. Ended events are skipped, and deleting an event cascades its waitlist rows.
+- **Shape:** every serialized event has `waitlistCount` and, per user, `waitlistPosition`
+  (1-based or `null`); `permissions` gains `joinWaitlist` and `leaveWaitlist`. The live
+  hub computes each client's position from the ordered waitlist, like `isRegistered`.
+  A client that sees itself go from waiting to registered shows a toast.
 
 ### Live updates
 The catalogue receives changes in real time over Server-Sent Events, a one-way HTTP
@@ -203,6 +233,11 @@ lives in `server/demo/` and two policy rules.
   Restricted audiences stay planner-only (`canRestrictEvent`), because choosing
   groups or invitees needs the user and group lists. Guests are limited to 5 new
   events an hour.
+- **Word filter:** `server/lib/moderation.js` rejects guest names and the name,
+  location and description of events from non-planners (400 with a neutral field
+  error, a warn log with the field only). It matches whole words after normalizing
+  case, accents, look-alike characters and repeated letters, so "Scunthorpe" passes.
+  Terms: `server/lib/blocked-terms.json` plus an optional `BLOCKED_TERMS_FILE`.
 - **Showcase and simulation:** `server/demo/showcase.js` keeps 48 upcoming public
   events organized by `host@demo.invalid` and 160 simulated attendees
   (`bot-NNN@demo.invalid`, hidden from user lists). `server/demo/index.js` signs

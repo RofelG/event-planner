@@ -9,3 +9,9 @@ db_connect.js
 .env.*
 !.env.example
 !.env.production.example
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+# Working copies created by coding agents
+.claude/worktrees/

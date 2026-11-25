@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { initials, roleLabel } from '../lib/format';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import { AccountSettingsModal } from './AccountSettingsModal';
 import { ThemeToggle } from './ThemeToggle';
 import { useOpenEditor } from '../hooks/useOpenEditor';
 
@@ -19,6 +20,7 @@ export function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const menuRef = useRef(null);
 
   // Close menus on navigation and on outside click.
@@ -103,6 +105,9 @@ export function NavBar() {
                   {!isGuest && <p className="truncate text-xs text-ink-500">{user.email}</p>}
                   <p className="mt-1 text-xs font-medium text-brand-700">{isGuest ? 'Demo guest' : roleLabel[user.role]}</p>
                 </div>
+                <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); setSettingsOpen(true); }} className="block w-full px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50">
+                  Account settings
+                </button>
                 {!isGuest && (
                   <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); setPasswordOpen(true); }} className="block w-full px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50">
                     Change password
@@ -140,6 +145,7 @@ export function NavBar() {
       )}
 
       <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
+      <AccountSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   );
 }

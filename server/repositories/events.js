@@ -19,6 +19,13 @@ const BASE_SELECT = `
          o.user_last AS organizer_last, e.event_visibility, e.event_hidden_at,
          (SELECT COUNT(*) FROM registration r WHERE r.event_id = e.event_id) AS attendee_count,
          EXISTS (SELECT 1 FROM registration r WHERE r.event_id = e.event_id AND r.user_id = ?) AS is_registered,
+         (SELECT COUNT(*) FROM waitlist w WHERE w.event_id = e.event_id) AS waitlist_count,
+         -- 1-based place in line (created_at, then user_id on ties); NULL when not waiting.
+         (SELECT NULLIF(COUNT(*), 0) FROM waitlist w
+            JOIN waitlist me ON me.event_id = w.event_id AND me.user_id = ?
+           WHERE w.event_id = e.event_id
+             AND (w.created_at < me.created_at OR (w.created_at = me.created_at AND w.user_id <= me.user_id))
+         ) AS waitlist_position,
          (SELECT JSON_ARRAYAGG(eg.group_id) FROM event_group eg WHERE eg.event_id = e.event_id) AS group_ids,
          (SELECT JSON_ARRAYAGG(ei.user_id) FROM event_invite ei WHERE ei.event_id = e.event_id) AS invite_ids
     FROM event e
@@ -44,6 +51,8 @@ function toEvent(row) {
     hiddenAt: toIso(row.event_hidden_at),
     attendeeCount: Number(row.attendee_count),
     isRegistered: Boolean(row.is_registered),
+    waitlistCount: Number(row.waitlist_count),
+    waitlistPosition: row.waitlist_position == null ? null : Number(row.waitlist_position),
     groupIds: parseIds(row.group_ids),
     inviteIds: parseIds(row.invite_ids),
   };
@@ -78,6 +87,44 @@ const columnValues = (e) => [
   e.visibility,
 ];
 
+/**
+ * Fills free seats from the waitlist, first come first served. Call inside a
+ * transaction that already holds the event row lock (SELECT ... FOR UPDATE).
+ * Does nothing for ended events. Returns the promoted user ids.
+ */
+async function promoteFromWaitlist(conn, eventId) {
+  const [[event]] = await conn.query(
+    'SELECT event_max, event_date_end <= UTC_TIMESTAMP() AS ended FROM event WHERE event_id = ? AND event_status = 1',
+    [eventId]
+  );
+  if (!event || event.ended) return [];
+  const [[{ taken }]] = await conn.query('SELECT COUNT(*) AS taken FROM registration WHERE event_id = ?', [eventId]);
+  const free = event.event_max - taken;
+  if (free <= 0) return [];
+  const [next] = await conn.query(
+    // Deactivated accounts keep their waitlist rows but are skipped, so a freed
+    // seat never goes to someone who can no longer use it.
+    `SELECT w.user_id FROM waitlist w JOIN \`user\` u ON u.user_id = w.user_id AND u.user_status = 1
+      WHERE w.event_id = ? ORDER BY w.created_at ASC, w.user_id ASC LIMIT ?`,
+    [eventId, free]
+  );
+  if (!next.length) return [];
+  const userIds = next.map((r) => r.user_id);
+  await conn.query('INSERT INTO registration (event_id, user_id) VALUES ?', [userIds.map((u) => [eventId, u])]);
+  await conn.query('DELETE FROM waitlist WHERE event_id = ? AND user_id IN (?)', [eventId, userIds]);
+  return userIds;
+}
+
+/** Locks the event row; returns it, or undefined when missing or deleted. */
+async function lockEvent(conn, eventId) {
+  const [[event]] = await conn.query(
+    `SELECT event_max, event_date_end <= UTC_TIMESTAMP() AS ended
+       FROM event WHERE event_id = ? AND event_status = 1 FOR UPDATE`,
+    [eventId]
+  );
+  return event;
+}
+
 module.exports = {
   toEvent,
 
@@ -87,7 +134,7 @@ module.exports = {
    */
   async list(viewerId, { includePast = false, typeId, search, mine = false, after, limit } = {}) {
     let sql = BASE_SELECT;
-    const params = [viewerId];
+    const params = [viewerId, viewerId];
     if (!includePast) sql += ' AND e.event_date_end > UTC_TIMESTAMP()';
     if (typeId) {
       sql += ' AND e.event_type = ?';
@@ -126,7 +173,7 @@ module.exports = {
       `${BASE_SELECT}
          AND o.user_email LIKE 'guest-%@demo.invalid'
          AND e.created_at < NOW() - INTERVAL ? HOUR`,
-      [0, ttlHours]
+      [0, 0, ttlHours]
     );
     const expired = rows.map(toEvent);
     if (expired.length) {
@@ -146,7 +193,7 @@ module.exports = {
 
   /** A single active event, unfiltered by ACL (see list). */
   async findById(viewerId, eventId) {
-    const [row] = await query(`${BASE_SELECT} AND e.event_id = ?`, [viewerId, eventId]);
+    const [row] = await query(`${BASE_SELECT} AND e.event_id = ?`, [viewerId, viewerId, eventId]);
     return row ? toEvent(row) : undefined;
   },
 
@@ -188,6 +235,8 @@ module.exports = {
         [...columnValues(data), eventId]
       );
       await writeAudience(conn, eventId, data);
+      // A higher capacity (or a later end date) may have opened seats.
+      await promoteFromWaitlist(conn, eventId);
     });
     return this.findById(viewerId, eventId);
   },
@@ -214,11 +263,7 @@ module.exports = {
     await transaction(async (conn) => {
       // FOR UPDATE serializes concurrent sign-ups for the same event, so two
       // people cannot both take the last seat.
-      const [[event]] = await conn.query(
-        `SELECT event_max, event_date_end <= UTC_TIMESTAMP() AS ended
-           FROM event WHERE event_id = ? AND event_status = 1 FOR UPDATE`,
-        [eventId]
-      );
+      const event = await lockEvent(conn, eventId);
       if (!event) throw notFound('Event not found');
       if (event.ended) throw conflict('This event has already ended.');
       const [[{ taken }]] = await conn.query(
@@ -232,17 +277,75 @@ module.exports = {
         if (err.code === 'ER_DUP_ENTRY') throw conflict('You are already registered for this event.');
         throw err;
       }
+      await conn.query('DELETE FROM waitlist WHERE event_id = ? AND user_id = ?', [eventId, userId]);
     });
   },
 
+  /** Frees the user's seat and gives it to the first person waiting. */
   async unregister(eventId, userId) {
-    const result = await query('DELETE FROM registration WHERE event_id = ? AND user_id = ?', [eventId, userId]);
+    return transaction(async (conn) => {
+      await lockEvent(conn, eventId);
+      const [result] = await conn.query('DELETE FROM registration WHERE event_id = ? AND user_id = ?', [eventId, userId]);
+      if (result.affectedRows === 0) return false;
+      await promoteFromWaitlist(conn, eventId);
+      return true;
+    });
+  },
+
+  /**
+   * Removes users from every seat and waitlist (demo guest cleanup), promoting
+   * waiting people into the seats freed. Returns the affected event ids.
+   */
+  async removeUsers(userIds) {
+    const rows = await query(
+      `SELECT event_id FROM registration WHERE user_id IN (?)
+       UNION SELECT event_id FROM waitlist WHERE user_id IN (?)`,
+      [userIds, userIds]
+    );
+    for (const { event_id: eventId } of rows) {
+      await transaction(async (conn) => {
+        await lockEvent(conn, eventId);
+        await conn.query('DELETE FROM waitlist WHERE event_id = ? AND user_id IN (?)', [eventId, userIds]);
+        await conn.query('DELETE FROM registration WHERE event_id = ? AND user_id IN (?)', [eventId, userIds]);
+        await promoteFromWaitlist(conn, eventId);
+      });
+    }
+    return rows.map((r) => r.event_id);
+  },
+
+  /** Joins the waitlist of a full event; 409 when seats are free, ended, registered or already waiting. */
+  async joinWaitlist(eventId, userId) {
+    await transaction(async (conn) => {
+      const event = await lockEvent(conn, eventId);
+      if (!event) throw notFound('Event not found');
+      if (event.ended) throw conflict('This event has already ended.');
+      const [[{ taken }]] = await conn.query('SELECT COUNT(*) AS taken FROM registration WHERE event_id = ?', [eventId]);
+      if (taken < event.event_max) throw conflict('This event has free seats. Join the event instead.');
+      const [[registered]] = await conn.query('SELECT 1 AS found FROM registration WHERE event_id = ? AND user_id = ?', [eventId, userId]);
+      if (registered) throw conflict('You are already registered for this event.');
+      try {
+        await conn.query('INSERT INTO waitlist (event_id, user_id) VALUES (?, ?)', [eventId, userId]);
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') throw conflict('You are already on the waitlist.');
+        throw err;
+      }
+    });
+  },
+
+  async leaveWaitlist(eventId, userId) {
+    const result = await query('DELETE FROM waitlist WHERE event_id = ? AND user_id = ?', [eventId, userId]);
     return result.affectedRows > 0;
+  },
+
+  /** User ids waiting for the event, first in line first. */
+  async waitlistUserIds(eventId) {
+    const rows = await query('SELECT user_id FROM waitlist WHERE event_id = ? ORDER BY created_at ASC, user_id ASC', [eventId]);
+    return rows.map((r) => r.user_id);
   },
 
   async attendees(eventId) {
     return query(
-      `SELECT u.user_id, u.user_first, u.user_last
+      `SELECT u.user_id, u.user_first, u.user_last, u.user_hide_name
          FROM registration r JOIN \`user\` u ON u.user_id = r.user_id
         WHERE r.event_id = ?
         ORDER BY r.created_at ASC`,

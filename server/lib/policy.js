@@ -7,7 +7,8 @@
  * user:  { id, role: 'user' | 'planner' | 'admin' | 'visitor', groupIds: number[] }
  * event: { organizerId, visibility: 'public' | 'restricted',
  *          groupIds: number[], inviteIds: number[], end: Date | string,
- *          attendeeCount, capacity, isRegistered, hiddenAt: string | null }
+ *          attendeeCount, capacity, isRegistered, hiddenAt: string | null,
+ *          waitlistPosition (1-based or null) }
  *
  * Demo mode (DEMO_MODE=true) adds two things:
  *   - visitors: people browsing without a session. They are VISITOR below and
@@ -92,6 +93,34 @@ function canLeaveEvent(user, event) {
   return canViewEvent(user, event) && event.isRegistered && !hasEnded(event);
 }
 
+/** Waitlist: only for full events the user can see but holds no seat in. */
+function canJoinWaitlist(user, event) {
+  return (
+    canViewEvent(user, event) &&
+    !event.hiddenAt &&
+    !event.isRegistered &&
+    event.waitlistPosition == null &&
+    !hasEnded(event) &&
+    event.attendeeCount >= event.capacity
+  );
+}
+
+function canLeaveWaitlist(user, event) {
+  return canViewEvent(user, event) && event.waitlistPosition != null;
+}
+
+/**
+ * Whether the viewer may see this attendee's real name and id in an attendee
+ * list. People who chose to hide their name are visible only to themselves and
+ * to those who manage the event (organizer, planner in a shared group, admin).
+ * attendee: { id, hideName }
+ */
+function canSeeAttendeeName(viewer, event, attendee) {
+  if (!attendee.hideName) return true;
+  if (!isVisitor(viewer) && viewer.id === attendee.id) return true;
+  return canManageEvent(viewer, event);
+}
+
 /** The permissions object sent to the client so it can show or hide controls. */
 function eventPermissions(user, event) {
   const manage = canManageEvent(user, event);
@@ -102,6 +131,8 @@ function eventPermissions(user, event) {
     leave: canLeaveEvent(user, event),
     hide: canModerateEvent(user) && !event.hiddenAt,
     unhide: canModerateEvent(user) && Boolean(event.hiddenAt),
+    joinWaitlist: canJoinWaitlist(user, event),
+    leaveWaitlist: canLeaveWaitlist(user, event),
   };
 }
 
@@ -118,6 +149,9 @@ module.exports = {
   canModerateEvent,
   canJoinEvent,
   canLeaveEvent,
+  canJoinWaitlist,
+  canLeaveWaitlist,
+  canSeeAttendeeName,
   hasEnded,
   eventPermissions,
 };
