@@ -56,7 +56,7 @@ server/
   app.js                Express app (exported for Supertest)
   index.js              Starts the HTTP server
   config.js             Validated environment configuration
-  db/                   Pool, schema.sql, seed script
+  db/                   Pool, migration runner and migrations/, seed script
   demo/                 Demo mode: accounts, showcase data, simulation and cleanup
   lib/policy.js         All access-control rules (pure functions)
   lib/live.js           Live update hub: open streams and per-user fan-out
@@ -124,6 +124,17 @@ merges live updates only into the part of the list already loaded.
 - **Abuse:** login and register are rate limited per IP. `helmet` sets security headers.
 - **Concurrency:** seat reservations lock the event row (`SELECT ... FOR UPDATE`) so
   capacity cannot be exceeded by simultaneous sign-ups.
+
+### Migrations
+The schema is versioned in `server/db/migrations/NNNN_name.sql` (four-digit number,
+then a short snake_case name). `server/db/migrate.js` runs on API start and via
+`npm run db:migrate`: it takes a MySQL named lock so concurrent processes cannot race,
+applies each file not yet listed in `schema_migrations` in name order, and records it.
+To change the schema, add the next numbered file; never edit one that has shipped.
+`0001_initial.sql` is idempotent so it is a safe baseline for databases created before
+migrations existed. MySQL DDL auto-commits, so a migration that fails halfway cannot be
+rolled back and its version is not recorded: fix the leftovers by hand, then re-run.
+Keep migrations small, one change each.
 
 ### Live updates
 The catalogue receives changes in real time over Server-Sent Events, a one-way HTTP

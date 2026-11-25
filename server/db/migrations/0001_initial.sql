@@ -1,6 +1,6 @@
--- Event Planner schema (MySQL 8).
--- Applied automatically by docker compose on first start, and by tests/setup.
--- Every statement is idempotent so the file can be re-run safely.
+-- Baseline migration: the Event Planner schema (MySQL 8) as it was before
+-- migrations existed. Every statement is idempotent (IF NOT EXISTS), so it is
+-- safe on databases created earlier from the old schema.sql.
 
 CREATE TABLE IF NOT EXISTS `user` (
   user_id        INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
