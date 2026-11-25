@@ -70,6 +70,13 @@ export function AuthProvider({ children }) {
     return me;
   }, []);
 
+  /** Saves account settings (e.g. { hideName }) and refreshes the signed-in user. */
+  const updateSettings = useCallback(async (settings) => {
+    const me = await api('/auth/settings', { method: 'PUT', body: settings });
+    setAccount(me);
+    return me;
+  }, []);
+
   const logout = useCallback(async () => {
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
     setAccount(null);
@@ -97,9 +104,10 @@ export function AuthProvider({ children }) {
       login,
       register,
       becomeGuest,
+      updateSettings,
       logout,
     };
-  }, [account, demo, status, expired, login, register, becomeGuest, logout]);
+  }, [account, demo, status, expired, login, register, becomeGuest, updateSettings, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

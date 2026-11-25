@@ -241,3 +241,21 @@ describe('showcase', () => {
     expect(directory.length).toBeLessThan(BOT_COUNT);
   });
 });
+
+describe('hidden names in demo mode', () => {
+  test('visitors see "Private attendee"; guests may set the flag, visitors may not', async () => {
+    const { agent } = await becomeGuest('Shy Guest');
+    await agent.post(`/api/events/${ids.public}/registration`).expect(201);
+    const saved = await agent.put('/api/auth/settings').send({ hideName: true }).expect(200);
+    expect(saved.body.hideName).toBe(true);
+
+    const visitor = request(app);
+    const people = (await visitor.get(`/api/events/${ids.public}/attendees`).expect(200)).body;
+    expect(JSON.stringify(people)).not.toContain('Shy Guest');
+    expect(people.find((p) => p.private)).toMatchObject({ name: 'Private attendee' });
+    const own = (await agent.get(`/api/events/${ids.public}/attendees`).expect(200)).body;
+    expect(own.some((p) => p.name === 'Shy Guest')).toBe(true);
+
+    await visitor.put('/api/auth/settings').send({ hideName: true }).expect(401);
+  });
+});

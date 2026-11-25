@@ -231,7 +231,7 @@ module.exports = {
 
   async attendees(eventId) {
     return query(
-      `SELECT u.user_id, u.user_first, u.user_last
+      `SELECT u.user_id, u.user_first, u.user_last, u.user_hide_name
          FROM registration r JOIN \`user\` u ON u.user_id = r.user_id
         WHERE r.event_id = ?
         ORDER BY r.created_at ASC`,

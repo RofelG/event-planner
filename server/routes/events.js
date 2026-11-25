@@ -129,12 +129,24 @@ router.delete('/:id', requireUser, validate(schemas.idParam, 'params'), async (r
   res.status(204).end();
 });
 
-// GET /api/events/:id/attendees - names of registered users (no emails).
+// GET /api/events/:id/attendees - names of registered users (no emails). People who
+// hide their name appear as "Private attendee" except to managers and themselves.
 router.get('/:id/attendees', validate(schemas.idParam, 'params'), async (req, res) => {
   const event = await loadVisible(req);
   const rows = await events.attendees(event.id);
-  // Demo guests have a single name, so trim the empty last name.
-  res.json(rows.map((r) => ({ id: r.user_id, name: `${r.user_first} ${r.user_last}`.trim() })));
+  let hidden = 0;
+  res.json(
+    rows.map((r) => {
+      const person = { id: r.user_id, hideName: Boolean(r.user_hide_name) };
+      if (policy.canSeeAttendeeName(req.user, event, person)) {
+        // Demo guests have a single name, so trim the empty last name.
+        return { id: r.user_id, name: `${r.user_first} ${r.user_last}`.trim() };
+      }
+      // No real id: it would let viewers correlate a hidden person across events.
+      // The key is only unique within this response.
+      return { id: `private-${hidden++}`, name: 'Private attendee', private: true };
+    })
+  );
 });
 
 // POST /api/events/:id/registration - join the event.

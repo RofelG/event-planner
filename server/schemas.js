@@ -47,6 +47,9 @@ const changePassword = z
   })
   .refine((d) => d.password === d.confirm, { path: ['confirm'], message: 'Passwords do not match' });
 
+// Unknown fields are dropped; add new account settings here.
+const accountSettings = z.object({ hideName: z.boolean({ error: 'hideName must be true or false' }) });
+
 const event = z
   .object({
     name: name('Name', 200),
@@ -107,4 +110,4 @@ const userUpdate = z
   })
   .refine((d) => Object.keys(d).length > 0, 'Nothing to update');
 
-module.exports = { register, login, changePassword, event, eventQuery, guest, idParam, group, userUpdate };
+module.exports = { register, login, changePassword, accountSettings, event, eventQuery, guest, idParam, group, userUpdate };
