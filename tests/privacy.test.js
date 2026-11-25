@@ -34,7 +34,7 @@ const eventBody = (over = {}) => ({
 beforeAll(async () => {
   await applySchema();
   await query('SET FOREIGN_KEY_CHECKS = 0');
-  for (const t of ['registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
+  for (const t of ['waitlist', 'registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
     await query(`TRUNCATE TABLE ${t}`);
   }
   await query('SET FOREIGN_KEY_CHECKS = 1');

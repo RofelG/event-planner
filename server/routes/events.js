@@ -192,4 +192,20 @@ router.delete('/:id/registration', requireUser, validate(schemas.idParam, 'param
   res.json(serialize(req.user, await events.findById(req.user.id, event.id)));
 });
 
+// POST /api/events/:id/waitlist - queue for a full event.
+router.post('/:id/waitlist', requireUser, validate(schemas.idParam, 'params'), async (req, res) => {
+  const event = await loadVisible(req);
+  await events.joinWaitlist(event.id, req.user.id);
+  live.eventChanged(event.id, event);
+  res.status(201).json(serialize(req.user, await events.findById(req.user.id, event.id)));
+});
+
+// DELETE /api/events/:id/waitlist - leave the queue.
+router.delete('/:id/waitlist', requireUser, validate(schemas.idParam, 'params'), async (req, res) => {
+  const event = await loadVisible(req);
+  if (!(await events.leaveWaitlist(event.id, req.user.id))) throw notFound('You are not on the waitlist for this event.');
+  live.eventChanged(event.id, event);
+  res.json(serialize(req.user, await events.findById(req.user.id, event.id)));
+});
+
 module.exports = router;

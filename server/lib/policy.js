@@ -7,7 +7,8 @@
  * user:  { id, role: 'user' | 'planner' | 'admin' | 'visitor', groupIds: number[] }
  * event: { organizerId, visibility: 'public' | 'restricted',
  *          groupIds: number[], inviteIds: number[], end: Date | string,
- *          attendeeCount, capacity, isRegistered }
+ *          attendeeCount, capacity, isRegistered,
+ *          waitlistPosition (1-based or null) }
  *
  * Demo mode (DEMO_MODE=true) adds two things:
  *   - visitors: people browsing without a session. They are VISITOR below and
@@ -84,6 +85,21 @@ function canLeaveEvent(user, event) {
   return canViewEvent(user, event) && event.isRegistered && !hasEnded(event);
 }
 
+/** Waitlist: only for full events the user can see but holds no seat in. */
+function canJoinWaitlist(user, event) {
+  return (
+    canViewEvent(user, event) &&
+    !event.isRegistered &&
+    event.waitlistPosition == null &&
+    !hasEnded(event) &&
+    event.attendeeCount >= event.capacity
+  );
+}
+
+function canLeaveWaitlist(user, event) {
+  return canViewEvent(user, event) && event.waitlistPosition != null;
+}
+
 /**
  * Whether the viewer may see this attendee's real name and id in an attendee
  * list. People who chose to hide their name are visible only to themselves and
@@ -104,6 +120,8 @@ function eventPermissions(user, event) {
     delete: manage,
     join: canJoinEvent(user, event),
     leave: canLeaveEvent(user, event),
+    joinWaitlist: canJoinWaitlist(user, event),
+    leaveWaitlist: canLeaveWaitlist(user, event),
   };
 }
 
@@ -119,6 +137,8 @@ module.exports = {
   canManageEvent,
   canJoinEvent,
   canLeaveEvent,
+  canJoinWaitlist,
+  canLeaveWaitlist,
   canSeeAttendeeName,
   hasEnded,
   eventPermissions,

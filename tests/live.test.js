@@ -104,7 +104,7 @@ const about = (id, type) => (m) => m.type === type && (m.data.id === id);
 beforeAll(async () => {
   await applySchema();
   await query('SET FOREIGN_KEY_CHECKS = 0');
-  for (const t of ['registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
+  for (const t of ['waitlist', 'registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
     await query(`TRUNCATE TABLE ${t}`);
   }
   await query('SET FOREIGN_KEY_CHECKS = 1');
@@ -168,6 +168,27 @@ describe('live stream', () => {
     expect(forOutsider.data).toMatchObject({ isRegistered: false, permissions: { join: true, leave: false } });
     // Audience details stay with managers, as in the REST API.
     expect(forOutsider.data).not.toHaveProperty('groupIds');
+  });
+
+  test('each viewer gets their own waitlist position, and promotion is pushed', async () => {
+    const { body: event } = await api('planner').post('/events', eventBody({ capacity: 1 })).expect(201);
+    await api('planner').post(`/events/${event.id}/registration`).expect(201);
+    await api('member').post(`/events/${event.id}/waitlist`).expect(201);
+    await api('outsider').post(`/events/${event.id}/waitlist`).expect(201);
+
+    const both = (m) => about(event.id, 'event')(m) && m.data.waitlistCount === 2;
+    const forMember = await member.next(both);
+    const forOutsider = await outsider.next(both);
+    expect(forMember.data.waitlistPosition).toBe(1);
+    expect(forOutsider.data.waitlistPosition).toBe(2);
+    expect(forMember.data.permissions).toMatchObject({ joinWaitlist: false, leaveWaitlist: true });
+    expect(forOutsider.data).not.toHaveProperty('groupIds');
+
+    await api('planner').del(`/events/${event.id}/registration`).expect(200);
+    const promoted = await member.next((m) => about(event.id, 'event')(m) && m.data.isRegistered);
+    expect(promoted.data).toMatchObject({ waitlistPosition: null, waitlistCount: 1 });
+    const moved = await outsider.next((m) => about(event.id, 'event')(m) && m.data.waitlistPosition === 1);
+    expect(moved.data).toMatchObject({ isRegistered: false, waitlistPosition: 1 });
   });
 
   test('changes to a restricted event never reach users outside its audience', async () => {

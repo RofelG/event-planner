@@ -40,6 +40,19 @@ export function useEventActions({ onChange, onRemove }) {
         onChange(await api(`/events/${event.id}/registration`, { method: 'DELETE' }));
         notify(`You left ${event.name}.`, 'info');
       }),
+    joinWaitlist: async (event) => {
+      if (!(await ensureSignedIn('join the waitlist'))) return;
+      await run(`joinWaitlist:${event.id}`, async () => {
+        const updated = await api(`/events/${event.id}/waitlist`, { method: 'POST' });
+        onChange(updated);
+        notify(`You are number ${updated.waitlistPosition} on the waitlist for ${event.name}.`);
+      });
+    },
+    leaveWaitlist: (event) =>
+      run(`leaveWaitlist:${event.id}`, async () => {
+        onChange(await api(`/events/${event.id}/waitlist`, { method: 'DELETE' }));
+        notify(`You left the waitlist for ${event.name}.`, 'info');
+      }),
     remove: (event) =>
       run(`delete:${event.id}`, async () => {
         await api(`/events/${event.id}`, { method: 'DELETE' });

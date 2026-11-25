@@ -72,15 +72,25 @@ function stream(req, res) {
 async function eventChanged(eventId, before) {
   if (clients.size === 0) return;
   try {
-    // Loaded once for everyone; viewer 0 matches no user, so isRegistered is
-    // filled in per client from the attendee list below.
+    // Loaded once for everyone; viewer 0 matches no user, so isRegistered and
+    // waitlistPosition are filled in per client from the lists below.
     const after = await events.findById(0, eventId);
     const attendeeIds = after ? new Set((await events.attendees(eventId)).map((r) => r.user_id)) : new Set();
+    const waiting = after ? await events.waitlistUserIds(eventId) : [];
 
     for (const client of clients) {
       const { user } = client;
       if (after && policy.canViewEvent(user, after)) {
-        send(client, 'event', serializeEvent(user, { ...after, isRegistered: attendeeIds.has(user.id) }));
+        const place = waiting.indexOf(user.id);
+        send(
+          client,
+          'event',
+          serializeEvent(user, {
+            ...after,
+            isRegistered: attendeeIds.has(user.id),
+            waitlistPosition: place === -1 ? null : place + 1,
+          })
+        );
       } else if (before && policy.canViewEvent(user, before)) {
         send(client, 'remove', { id: eventId });
       }

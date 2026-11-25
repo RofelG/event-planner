@@ -42,7 +42,7 @@ beforeAll(async () => {
   // Start from empty tables like the other suites, so the fixed emails below can
   // be inserted again on every run.
   await query('SET FOREIGN_KEY_CHECKS = 0');
-  for (const t of ['password_reset', 'registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
+  for (const t of ['password_reset', 'waitlist', 'registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
     await query(`TRUNCATE TABLE ${t}`);
   }
   await query('SET FOREIGN_KEY_CHECKS = 1');
