@@ -6,6 +6,7 @@ const { pool } = require('./db/pool');
 const { migrate } = require('./db/migrate');
 const live = require('./lib/live');
 const demo = require('./demo');
+const logger = require('./lib/logger');
 
 let server;
 
@@ -23,13 +24,13 @@ process.on('SIGTERM', shutdown);
 migrate()
   .then(() => {
     server = app.listen(config.port, () => {
-      console.log(`API listening on http://localhost:${config.port} (${config.env})`);
+      logger.info({ port: config.port, env: config.env }, 'API listening');
       if (config.demo.enabled) {
-        demo.start().catch((err) => console.error('Demo mode failed to start', err));
+        demo.start().catch((err) => logger.error({ err }, 'Demo mode failed to start'));
       }
     });
   })
   .catch((err) => {
-    console.error(`Database migration failed, not starting: ${err.message}`);
+    logger.fatal({ err }, 'Database migration failed, not starting');
     pool.end().finally(() => process.exit(1));
   });

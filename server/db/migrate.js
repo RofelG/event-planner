@@ -16,8 +16,8 @@ const { pool } = require('./pool');
 const DEFAULT_DIR = path.join(__dirname, 'migrations');
 const LOCK_NAME = 'event_planner_migrations';
 const LOCK_TIMEOUT_SECONDS = 60;
-// Every test file migrates in beforeAll; keep that out of the test output.
-const log = process.env.NODE_ENV === 'test' ? () => {} : console.log;
+// Silent under tests (every test file migrates in beforeAll).
+const logger = require('../lib/logger');
 
 // Same splitting as the old applySchema: drop comment lines, split on ';' at line end.
 function splitStatements(sql) {
@@ -57,9 +57,9 @@ async function migrate({ dir = DEFAULT_DIR } = {}) {
         throw err;
       }
       applied.push(version);
-      log(`Applied migration ${version}`);
+      logger.info({ version }, 'Applied migration');
     }
-    if (!applied.length) log('Database schema is up to date');
+    if (!applied.length) logger.info('Database schema is up to date');
     return applied;
   } finally {
     if (locked) await conn.query('SELECT RELEASE_LOCK(?)', [LOCK_NAME]).catch(() => {});
@@ -73,7 +73,7 @@ if (require.main === module) {
   migrate()
     .then(() => pool.end())
     .catch((err) => {
-      console.error(err.message);
+      logger.error({ err }, 'Migration failed');
       pool.end().finally(() => process.exit(1));
     });
 }

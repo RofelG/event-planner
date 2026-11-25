@@ -59,6 +59,7 @@ server/
   db/                   Pool, migration runner and migrations/, seed script
   demo/                 Demo mode: accounts, showcase data, simulation and cleanup
   lib/policy.js         All access-control rules (pure functions)
+  lib/logger.js         Shared pino logger (JSON in production, pretty in development)
   lib/live.js           Live update hub: open streams and per-user fan-out
   lib/serialize.js      Event response shape, shared by REST and the stream
   middleware/           authenticate, requireRole, validate (zod)
@@ -175,6 +176,11 @@ pass `state={{ background: location }}`. `App.jsx` renders the page routes at th
 background location and the editor in a second route table, so the URL is still
 `/manage/new` or `/manage/:id/edit` and links can be shared or bookmarked. On a direct
 visit there is no background, so Manage Events renders underneath the modal.
+
+### Logging
+`server/lib/logger.js` exports one shared pino logger. `LOG_LEVEL` sets the level (default `info`; always `silent` under `NODE_ENV=test`). Development output is pretty-printed through pino-pretty; production writes one JSON object per line to stdout for the log collector. Cookies, authorization headers and `password`, `current` and `confirm` fields are redacted.
+
+`pino-http` in `app.js` logs one line per request (method, url, status, duration, request id; 4xx at `warn`, 5xx at `error`). `/api/health` and the long-lived `/api/events/stream` are not logged. Unexpected errors: the error handler sets `res.err`, so the request line is logged at `error` with the real `err` (message and stack) next to the request id; clients still receive only the generic JSON error. Use `logger` (or `req.log` inside a request), never `console`. The CLI seed script keeps `console` for its terminal output.
 
 ### Demo mode
 `DEMO_MODE=true` turns the app into a public showcase (setup in the README). The code

@@ -1,11 +1,14 @@
 'use strict';
 
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
+const pinoHttp = require('pino-http');
 const config = require('./config');
+const logger = require('./lib/logger');
 const { authenticate, authenticateWith } = require('./middleware/auth');
 const live = require('./lib/live');
 const { HttpError } = require('./lib/errors');
@@ -17,6 +20,31 @@ const demoRoutes = require('./routes/demo');
 const app = express();
 
 app.disable('x-powered-by');
+
+// One line per finished request (method, url, status, duration, request id).
+// pino-http also logs when a connection closes early, so a long-lived response
+// would be logged only when it ends, with a duration of minutes that measures
+// the connection, not a request. The SSE stream is therefore skipped, as is the
+// health probe, which would otherwise be noise every few seconds.
+const QUIET_PATHS = new Set(['/api/health', '/api/events/stream']);
+app.use(
+  pinoHttp({
+    logger,
+    // Unique across restarts, unlike pino-http's default counter.
+    genReqId: () => crypto.randomUUID(),
+    autoLogging: { ignore: (req) => QUIET_PATHS.has(req.url.split('?')[0]) },
+    // Only id, method and url: headers (cookies) stay out of the log entirely.
+    serializers: {
+      req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+      res: (res) => ({ statusCode: res.statusCode }),
+    },
+    customLogLevel: (req, res, err) => {
+      if (err || res.statusCode >= 500) return 'error';
+      if (res.statusCode >= 400) return 'warn';
+      return 'info';
+    },
+  })
+);
 app.set('trust proxy', config.isProduction ? 1 : false);
 app.use(helmet());
 app.use(express.json({ limit: '100kb' }));
@@ -77,7 +105,9 @@ app.use((err, req, res, next) => {
     return res.status(413).json({ error: 'Request body is too large.' });
   }
   // Unknown errors: log server-side, never leak internals to the client.
-  console.error(err);
+  // pino-http logs res.err with the request line when the response finishes,
+  // so the real error appears once, next to its request id and status.
+  res.err = err;
   res.status(500).json({ error: 'Something went wrong. Please try again.' });
 });
 
