@@ -1,5 +1,6 @@
 'use strict';
 
+const logger = require('./logger');
 const events = require('../repositories/events');
 const policy = require('./policy');
 const { serializeEvent } = require('./serialize');
@@ -85,7 +86,7 @@ async function eventChanged(eventId, before) {
       }
     }
   } catch (err) {
-    console.error('Live update failed', err);
+    logger.error({ err, eventId }, 'Live update failed');
   }
 }
 
