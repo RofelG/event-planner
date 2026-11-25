@@ -8,12 +8,26 @@
 
 import { api } from './api';
 
+// The server sends a `ping` every 15 seconds. If nothing at all arrives for
+// this long, the connection is dead even if the browser still thinks it is
+// open (for example a proxy kept it after the API restarted), so reopen it.
+const STALE_MS = 40 * 1000;
+
 const listeners = new Set();
 const statusListeners = new Set();
 let source = null;
 let status = 'offline'; // 'connecting' | 'live' | 'offline'
 let hasConnected = false;
 let retryTimer = null;
+let lastSeen = 0;
+let watchdog = null;
+
+function startWatchdog() {
+  clearInterval(watchdog);
+  watchdog = setInterval(() => {
+    if (source && Date.now() - lastSeen > STALE_MS) reconnect();
+  }, 5000);
+}
 
 function setStatus(next) {
   status = next;
@@ -26,16 +40,27 @@ function dispatch(message) {
 
 function open() {
   clearTimeout(retryTimer);
+  retryTimer = null;
   setStatus('connecting');
+  lastSeen = Date.now();
+  startWatchdog();
   source = new EventSource('/api/events/stream');
+  const seen = () => {
+    lastSeen = Date.now();
+  };
 
   source.addEventListener('ready', () => {
+    seen();
     if (hasConnected) dispatch({ type: 'reconnected' });
     hasConnected = true;
     setStatus('live');
   });
+  source.addEventListener('ping', seen);
   for (const type of ['event', 'remove']) {
-    source.addEventListener(type, (e) => dispatch({ type, data: JSON.parse(e.data) }));
+    source.addEventListener(type, (e) => {
+      seen();
+      dispatch({ type, data: JSON.parse(e.data) });
+    });
   }
   source.onerror = () => {
     // EventSource retries dropped connections itself. It gives up (CLOSED)
@@ -59,6 +84,7 @@ function open() {
 
 function close() {
   clearTimeout(retryTimer);
+  clearInterval(watchdog);
   retryTimer = null;
   source?.close();
   source = null;
@@ -82,6 +108,18 @@ export function subscribe(listener) {
  */
 export function publishLocal(message) {
   dispatch(message);
+}
+
+/**
+ * Reopens the connection, for example after the user signs in or gives a
+ * name, so the server sends updates for the new identity. Subscribers get a
+ * 'reconnected' message and reload.
+ */
+export function reconnect() {
+  if (!listeners.size) return;
+  source?.close();
+  source = null;
+  open();
 }
 
 export function getStatus() {

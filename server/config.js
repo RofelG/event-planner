@@ -28,7 +28,20 @@ const config = {
     // Tests run against an isolated <DB_DB>_test database created by docker compose.
     database: isTest ? `${required('DB_DB')}_test` : required('DB_DB'),
   },
+  // Public demo: visitors browse without an account, give a name to join or
+  // create events, and their events are removed after ttlHours. Showcase
+  // events with simulated attendees keep the catalogue busy. See README.
+  demo: {
+    enabled: process.env.DEMO_MODE === 'true',
+    ttlHours: Number(process.env.DEMO_EVENT_TTL_HOURS || 48),
+    // Simulated attendees joining and leaving showcase events (off in tests).
+    simulate: process.env.DEMO_SIMULATE !== 'false' && !isTest,
+  },
 };
+
+if (!(config.demo.ttlHours > 0)) {
+  throw new Error('DEMO_EVENT_TTL_HOURS must be a positive number.');
+}
 
 if (config.tokenKey.length < 32) {
   throw new Error('TOKEN_KEY must be at least 32 characters.');

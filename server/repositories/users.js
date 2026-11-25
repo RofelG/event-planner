@@ -1,6 +1,10 @@
 'use strict';
 
 const { query, transaction } = require('../db/pool');
+const { isGuestEmail } = require('../demo/accounts');
+
+// Simulated demo attendees are not people: keep them out of user lists.
+const NOT_BOT = "user_email NOT LIKE 'bot-%@demo.invalid'";
 
 const PUBLIC_COLUMNS = 'user_id, user_first, user_last, user_email, user_role, user_status, token_version';
 
@@ -49,6 +53,15 @@ module.exports = {
     return this.findActiveById(id);
   },
 
+  /** Demo mode: a visitor who gave their name to join or create an event. */
+  async createGuest({ name, email, passwordHash }) {
+    const result = await query(
+      "INSERT INTO `user` (user_first, user_last, user_email, user_password, user_role) VALUES (?, '', ?, ?, 'user')",
+      [name, email, passwordHash]
+    );
+    return this.findActiveById(result.insertId);
+  },
+
   async groupIdsFor(userId) {
     const rows = await query('SELECT group_id FROM user_group WHERE user_id = ?', [userId]);
     return rows.map((r) => r.group_id);
@@ -57,7 +70,7 @@ module.exports = {
   /** Names only: what planners need to pick invitees. */
   async directory() {
     return query(
-      'SELECT user_id, user_first, user_last FROM `user` WHERE user_status = 1 ORDER BY user_last, user_first'
+      `SELECT user_id, user_first, user_last FROM \`user\` WHERE user_status = 1 AND ${NOT_BOT} ORDER BY user_last, user_first`
     );
   },
 
@@ -67,6 +80,7 @@ module.exports = {
       `SELECT u.user_id, u.user_first, u.user_last, u.user_email, u.user_role, u.user_status,
               (SELECT JSON_ARRAYAGG(ug.group_id) FROM user_group ug WHERE ug.user_id = u.user_id) AS group_ids
          FROM \`user\` u
+        WHERE u.${NOT_BOT}
         ORDER BY u.user_last, u.user_first`
     );
   },
@@ -108,6 +122,8 @@ module.exports = {
       last: row.user_last,
       email: row.user_email,
       role: row.user_role,
+      // Demo visitors who gave a name; they have no password to manage.
+      isGuest: isGuestEmail(row.user_email),
     };
   },
 };

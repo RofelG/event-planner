@@ -2,6 +2,7 @@
 
 const { z } = require('zod');
 const { ROLES } = require('./lib/policy');
+const { decodeCursor } = require('./lib/cursor');
 
 const name = (label, max = 100) =>
   z.string({ error: `${label} is required` }).trim().min(1, `${label} is required`).max(max);
@@ -67,6 +68,31 @@ const eventQuery = z.object({
   q: z.string().trim().max(100).optional(),
   past: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
   manageable: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
+  // Only events the caller has joined.
+  mine: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
+  // Pagination: with `limit` the response is { items, nextCursor } instead of an array.
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  cursor: z
+    .string()
+    .max(200)
+    .optional()
+    .transform((value, ctx) => {
+      if (value === undefined) return undefined;
+      const decoded = decodeCursor(value);
+      if (!decoded) {
+        ctx.addIssue({ code: 'custom', message: 'Invalid cursor' });
+        return z.NEVER;
+      }
+      return decoded;
+    }),
+});
+
+// Demo mode: the name a visitor gives to join or create events.
+const guest = z.object({
+  name: name('Your name', 60).refine(
+    (n) => /^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u.test(n),
+    'Use letters, spaces, apostrophes, hyphens or periods'
+  ),
 });
 
 const idParam = z.object({ id });
@@ -81,4 +107,4 @@ const userUpdate = z
   })
   .refine((d) => Object.keys(d).length > 0, 'Nothing to update');
 
-module.exports = { register, login, changePassword, event, eventQuery, idParam, group, userUpdate };
+module.exports = { register, login, changePassword, event, eventQuery, guest, idParam, group, userUpdate };

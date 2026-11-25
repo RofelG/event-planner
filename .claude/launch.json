@@ -2,6 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     { "name": "api", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:api"], "port": 3001 },
+    { "name": "api-demo", "runtimeExecutable": "cmd", "runtimeArgs": ["/c", "set DEMO_MODE=true&& set DB_DB=event_planner_test&& node server/index.js"], "port": 3001 },
     { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:web"], "port": 5173 }
   ]
 }

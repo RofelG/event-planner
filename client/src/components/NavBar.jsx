@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { initials, roleLabel } from '../lib/format';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { ThemeToggle } from './ThemeToggle';
+import { useOpenEditor } from '../hooks/useOpenEditor';
 
 const linkClass = ({ isActive }) =>
   `press rounded-md px-3 py-2 text-sm font-medium ${
@@ -11,8 +12,9 @@ const linkClass = ({ isActive }) =>
   }`;
 
 export function NavBar() {
-  const { user, isPlanner, isAdmin, logout } = useAuth();
+  const { user, isPlanner, isAdmin, isVisitor, isGuest, canCreate, demo, logout } = useAuth();
   const navigate = useNavigate();
+  const openEditor = useOpenEditor();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -39,7 +41,8 @@ export function NavBar() {
 
   const signOut = async () => {
     await logout();
-    navigate('/login', { replace: true });
+    // In demo mode the catalogue stays open to visitors.
+    navigate(demo.enabled ? '/' : '/login', { replace: true });
   };
 
   // Links are shown by role for convenience only; the API enforces access.
@@ -63,16 +66,22 @@ export function NavBar() {
 
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          {isPlanner && (
+          {canCreate && (
             <button
               type="button"
-              onClick={() => navigate('/manage/new', { state: { background: location } })}
+              onClick={() => openEditor()}
               className="press hidden h-9 items-center rounded-lg bg-brand-600 px-3.5 text-sm font-medium text-white hover:bg-brand-700 dark:hover:bg-brand-600 dark:hover:brightness-90 sm:inline-flex"
             >
               Create event
             </button>
           )}
 
+          {/* Demo visitors have no account; staff can still sign in. */}
+          {isVisitor ? (
+            <NavLink to="/login" className="press rounded-md px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900">
+              Staff sign in
+            </NavLink>
+          ) : (
           <div className="relative" ref={menuRef}>
             <button
               type="button"
@@ -89,19 +98,23 @@ export function NavBar() {
             {menuOpen && (
               <div role="menu" className="anim-menu absolute right-0 mt-2 w-60 overflow-hidden rounded-xl border border-ink-200 bg-surface shadow-pop">
                 <div className="border-b border-ink-100 px-4 py-3">
-                  <p className="truncate text-sm font-semibold text-ink-900">{user.first} {user.last}</p>
-                  <p className="truncate text-xs text-ink-500">{user.email}</p>
-                  <p className="mt-1 text-xs font-medium text-brand-700">{roleLabel[user.role]}</p>
+                  <p className="truncate text-sm font-semibold text-ink-900">{`${user.first} ${user.last}`.trim()}</p>
+                  {/* A guest's email is a random placeholder, so it is not shown. */}
+                  {!isGuest && <p className="truncate text-xs text-ink-500">{user.email}</p>}
+                  <p className="mt-1 text-xs font-medium text-brand-700">{isGuest ? 'Demo guest' : roleLabel[user.role]}</p>
                 </div>
-                <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); setPasswordOpen(true); }} className="block w-full px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50">
-                  Change password
-                </button>
-                <button role="menuitem" type="button" onClick={signOut} className="block w-full border-t border-ink-100 px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50">
-                  Sign out
+                {!isGuest && (
+                  <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); setPasswordOpen(true); }} className="block w-full px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50">
+                    Change password
+                  </button>
+                )}
+                <button role="menuitem" type="button" onClick={signOut} className={`block w-full px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50 ${isGuest ? '' : 'border-t border-ink-100'}`}>
+                  {isGuest ? 'Forget my name' : 'Sign out'}
                 </button>
               </div>
             )}
           </div>
+          )}
 
           <button
             type="button"
@@ -118,7 +131,11 @@ export function NavBar() {
       {mobileOpen && (
         <div id="mobile-nav" className="anim-drop flex flex-col gap-1 border-t border-ink-100 px-4 py-3 md:hidden">
           {links}
-          {isPlanner && <NavLink to="/manage/new" state={{ background: location }} onClick={() => setMobileOpen(false)} className={linkClass}>Create event</NavLink>}
+          {canCreate && (
+            <button type="button" onClick={() => { setMobileOpen(false); openEditor(); }} className={`${linkClass({ isActive: false })} text-left`}>
+              Create event
+            </button>
+          )}
         </div>
       )}
 

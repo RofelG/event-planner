@@ -23,7 +23,10 @@ const { serializeEvent } = require('./serialize');
 // Streams are closed periodically so the browser reconnects and the user's
 // role, groups and session are re-checked by the authenticate middleware.
 const MAX_STREAM_MS = 5 * 60 * 1000;
-const HEARTBEAT_MS = 25 * 1000;
+// A named `ping` event (not an SSE comment, which browsers never surface) so
+// the client can tell a quiet stream from a dead one. Keep in sync with
+// STALE_MS in client/src/lib/live.js.
+const HEARTBEAT_MS = 15 * 1000;
 
 const clients = new Set();
 
@@ -47,8 +50,9 @@ function stream(req, res) {
   clients.add(client);
   send(client, 'ready', { at: new Date().toISOString() });
 
-  // Comment lines keep idle connections open through proxies.
-  const heartbeat = setInterval(() => res.write(': ping\n\n'), HEARTBEAT_MS);
+  // Keeps idle connections open through proxies and proves to the client that
+  // the stream is still alive.
+  const heartbeat = setInterval(() => send(client, 'ping', {}), HEARTBEAT_MS);
   const expiry = setTimeout(() => res.end(), MAX_STREAM_MS);
 
   const cleanup = () => {

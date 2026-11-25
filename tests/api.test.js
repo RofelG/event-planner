@@ -349,3 +349,73 @@ describe('admin: users and groups', () => {
     await admin.delete(`/api/groups/${g.body.id}`).expect(404);
   });
 });
+
+describe('catalogue pagination', () => {
+  beforeAll(async () => {
+    // A mix of visible and hidden events, several sharing one start time so
+    // the (start, id) tie-break is exercised.
+    const sameStart = inDays(9);
+    for (let i = 0; i < 4; i += 1) {
+      await planner.post('/api/events').send(eventBody({ name: `Paged ${i}`, start: sameStart, end: inDays(9.1) })).expect(201);
+    }
+    for (let i = 0; i < 3; i += 1) {
+      await planner
+        .post('/api/events')
+        .send(eventBody({ name: `Paged hidden ${i}`, start: sameStart, end: inDays(9.1), visibility: 'restricted', groupIds: [ids.group] }))
+        .expect(201);
+    }
+  });
+
+  /** Follows nextCursor until the end and returns every id, in order. */
+  async function readAll(agent, query = '') {
+    const seen = [];
+    let cursor = null;
+    for (let page = 0; page < 50; page += 1) {
+      const url = `/api/events?limit=2${query}${cursor ? `&cursor=${cursor}` : ''}`;
+      const { body } = await agent.get(url).expect(200);
+      expect(body.items.length).toBeLessThanOrEqual(2);
+      seen.push(...body.items.map((e) => e.id));
+      if (!body.nextCursor) return seen;
+      cursor = body.nextCursor;
+    }
+    throw new Error('Pagination did not finish');
+  }
+
+  test('pages cover exactly the unpaged list, in order, with no repeats', async () => {
+    for (const agent of [outsider, member, admin]) {
+      const all = (await agent.get('/api/events').expect(200)).body.map((e) => e.id);
+      expect(await readAll(agent)).toEqual(all);
+    }
+  });
+
+  test('hidden events never appear on any page', async () => {
+    const ids_ = await readAll(outsider);
+    const { body } = await admin.get('/api/events').expect(200);
+    const hidden = body.filter((e) => e.name.startsWith('Paged hidden')).map((e) => e.id);
+    expect(hidden.length).toBe(3);
+    expect(ids_.some((id) => hidden.includes(id))).toBe(false);
+  });
+
+  test('filters apply to pages, including mine=true', async () => {
+    const all = (await member.get('/api/events?q=Paged').expect(200)).body.map((e) => e.id);
+    expect(await readAll(member, '&q=Paged')).toEqual(all);
+
+    const target = all[0];
+    await member.post(`/api/events/${target}/registration`).expect(201);
+    expect(await readAll(member, '&mine=true')).toContain(target);
+    const mine = (await member.get('/api/events?limit=50&mine=true').expect(200)).body.items;
+    expect(mine.every((e) => e.isRegistered)).toBe(true);
+  });
+
+  test('a malformed cursor is rejected', async () => {
+    await member.get('/api/events?limit=2&cursor=not-a-cursor').expect(400);
+  });
+
+  test('demo endpoints report demo mode off and refuse guests', async () => {
+    const { body } = await request(app).get('/api/demo').expect(200);
+    expect(body).toEqual({ enabled: false, ttlHours: null });
+    await request(app).post('/api/demo/guest').send({ name: 'Visitor' }).expect(404);
+    // Without demo mode the catalogue still requires a session.
+    await request(app).get('/api/events').expect(401);
+  });
+});
