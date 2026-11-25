@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
@@ -28,9 +28,37 @@ export function ManageEventsPage() {
     onRemove: (id) => events.setData((list) => list.filter((e) => e.id !== id)),
   });
 
-  // Any live change (seats, edits by teammates, saves from the editor modal)
-  // reloads the table; it is filtered server-side by what the user can manage.
-  useLiveEvents(() => events.reload());
+  // Live changes update the table in place: seat counts and edits replace
+  // their row, and removals (or losing the right to manage) drop it. Only an
+  // event that is new to this table, or a reconnect, needs the server's list,
+  // and a burst of those is folded into one reload. Reloading on every
+  // message would refetch the table several times a second in demo mode.
+  const reloadTimer = useRef(null);
+  // Always the current reload, so a timer set before "Include past events"
+  // changed cannot refetch the old list.
+  const reloadLatest = useRef(events.reload);
+  reloadLatest.current = events.reload;
+  const reloadSoon = () => {
+    clearTimeout(reloadTimer.current);
+    reloadTimer.current = setTimeout(() => reloadLatest.current(), 600);
+  };
+  useEffect(() => () => clearTimeout(reloadTimer.current), []);
+
+  useLiveEvents((message) => {
+    if (message.type === 'reconnected') return reloadSoon();
+    if (message.type === 'remove') {
+      return events.setData((list) => list && list.filter((e) => e.id !== message.data.id));
+    }
+    if (message.type !== 'event') return undefined;
+    const event = message.data;
+    if (events.data?.some((e) => e.id === event.id)) {
+      return events.setData((list) =>
+        event.permissions.edit ? list.map((e) => (e.id === event.id ? event : e)) : list.filter((e) => e.id !== event.id)
+      );
+    }
+    if (event.permissions.edit) reloadSoon();
+    return undefined;
+  });
 
   const confirmDelete = async () => {
     await actions.remove(deleting);
