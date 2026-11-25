@@ -87,6 +87,8 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | POST | `/api/events` | Planner, admin; any signed-in user in demo | 201 with `Location` header |
 | PUT | `/api/events/:id` | Organizer, planner in a shared group, admin | Full replacement |
 | DELETE | `/api/events/:id` | Organizer, planner in a shared group, admin | Soft delete (204) |
+| POST | `/api/events/:id/hide` | Admin | Moderation: hide the event from everyone but admins; returns the event with `hidden: true` |
+| DELETE | `/api/events/:id/hide` | Admin | Unhide; visibility rules apply again as before |
 | GET | `/api/events/:id/attendees` | Can view event | Names only |
 | POST | `/api/events/:id/registration` | Can view event | Join (201); 409 when full or already joined |
 | DELETE | `/api/events/:id/registration` | Can view event | Leave |
@@ -118,6 +120,7 @@ merges live updates only into the part of the list already loaded.
 - **Authorization:** planners manage events they organize or that are shared with one of their groups; admins manage all. Role and group membership are read from the database on every
   request, so changes apply immediately. All rules live in `policy.js`. Events a user
   cannot see return 404 from every endpoint (detail, attendees, registration).
+  An event hidden by an admin (`event_hidden_at`) is visible to admins only, not even its organizer, and is treated as missing for everyone else, including the live stream.
 - **Input:** every body, query and path parameter is validated with zod; unknown fields
   are dropped, which prevents mass assignment (for example a client setting its own role).
   All SQL is parameterized.

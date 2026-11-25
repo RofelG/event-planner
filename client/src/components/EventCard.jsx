@@ -17,7 +17,7 @@ function Detail({ label, children }) {
  * Controls are driven by event.permissions, which the API computes per user.
  * Edit and Delete only render for the organizer, a planner in a group the event is shared with, or an admin.
  */
-export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) {
+export function EventCard({ event, actions, onAttendees, onDelete, onHide, index = 0 }) {
   const navigate = useNavigate();
   const location = useLocation();
   // Skips the seat-count pop on first render; after that it plays whenever the
@@ -41,6 +41,7 @@ export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) 
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="brand">{event.type.name}</Badge>
           {event.visibility === 'restricted' && <Badge tone="warning">Restricted</Badge>}
+          {event.hidden && <Badge tone="danger">Hidden</Badge>}
           {/* Mounts when the user joins, so the pop plays as confirmation. */}
           {event.isRegistered && <span className="anim-pop"><Badge tone="success">You are going</Badge></span>}
         </div>
@@ -80,8 +81,14 @@ export function EventCard({ event, actions, onAttendees, onDelete, index = 0 }) 
         )}
         <Button size="sm" variant="ghost" onClick={() => onAttendees(event)}>View attendees</Button>
 
-        {(can.edit || can.delete) && (
+        {(can.edit || can.delete || can.hide || can.unhide) && (
           <div className="ml-auto flex gap-1">
+            {can.hide && (
+              <Button size="sm" variant="ghost" onClick={() => onHide(event)}>Hide</Button>
+            )}
+            {can.unhide && (
+              <Button size="sm" variant="ghost" onClick={() => actions.unhide(event)} loading={actions.isPending('unhide', event.id)}>Unhide</Button>
+            )}
             {can.edit && (
               <Button size="sm" variant="ghost" onClick={() => navigate(`/manage/${event.id}/edit`, { state: { background: location } })}>Edit</Button>
             )}

@@ -9,10 +9,12 @@ const policy = require('./policy');
  */
 function serializeEvent(user, event) {
   const permissions = policy.eventPermissions(user, event);
-  const { organizerId, groupIds, inviteIds, ...rest } = event;
+  const { organizerId, groupIds, inviteIds, hiddenAt, ...rest } = event;
   return {
     ...rest,
     isFull: event.attendeeCount >= event.capacity,
+    // Only admins can see hidden events, so only they need the flag.
+    ...(policy.isAdmin(user) ? { hidden: Boolean(hiddenAt) } : {}),
     ...(permissions.edit ? { groupIds, inviteIds } : {}),
     permissions,
   };
