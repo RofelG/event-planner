@@ -251,6 +251,16 @@ describe('restricted event visibility', () => {
     await outsider.post(`/api/events/${groupEvent.id}/registration`).expect(404);
   });
 
+  test('calendar.ics is a download for visible events and 404 for hidden or missing ones', async () => {
+    await outsider.get(`/api/events/${groupEvent.id}/calendar.ics`).expect(404);
+    await outsider.get('/api/events/999999/calendar.ics').expect(404);
+    const res = await outsider.get(`/api/events/${inviteEvent.id}/calendar.ics`).expect(200);
+    expect(res.headers['content-type']).toMatch(/^text\/calendar; charset=utf-8/);
+    expect(res.headers['content-disposition']).toBe('attachment; filename="Invite-only.ics"');
+    expect(res.text).toContain(`UID:event-${inviteEvent.id}@event-planner\r\n`);
+    expect(res.text).toContain('SUMMARY:Invite only\r\n');
+  });
+
   test('a planner outside the audience cannot see it, the organizer and admin can', async () => {
     expect(await names(otherPlanner)).not.toContain('Invite only');
     expect(await names(planner)).toContain('Invite only');

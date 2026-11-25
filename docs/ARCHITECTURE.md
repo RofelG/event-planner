@@ -88,6 +88,7 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | POST | `/api/events` | Planner, admin; any signed-in user in demo | 201 with `Location` header |
 | PUT | `/api/events/:id` | Organizer, planner in a shared group, admin | Full replacement |
 | DELETE | `/api/events/:id` | Organizer, planner in a shared group, admin | Soft delete (204) |
+| GET | `/api/events/:id/calendar.ics` | Can view event | Single-event iCalendar download (`text/calendar`, attachment); 404 when hidden or missing |
 | GET | `/api/events/:id/attendees` | Can view event | Names only; users with `hideName` appear as "Private attendee" (`private: true`, no real id) unless the viewer manages the event or is that user |
 | POST | `/api/events/:id/registration` | Can view event | Join (201); 409 when full or already joined |
 | DELETE | `/api/events/:id/registration` | Can view event | Leave |
@@ -126,7 +127,13 @@ merges live updates only into the part of the list already loaded.
   are dropped, which prevents mass assignment (for example a client setting its own role).
   All SQL is parameterized.
 - **CSRF:** SameSite=Strict cookies, plus the API rejects non-JSON write requests (415).
-- **Abuse:** login and register are rate limited per IP. `helmet` sets security headers.
+- **Password reset:** `POST /api/auth/forgot` always answers 202 and does its lookup and
+  email after responding, so neither the body nor the timing reveals whether an account
+  exists. Tokens are 32 random bytes, valid 30 minutes, single use; only their SHA-256 hash
+  is stored (`password_reset`). A new request invalidates earlier ones. Redeeming a token
+  sets the password through the same path as a password change, so all sessions are signed
+  out. Demo guests and deactivated accounts get no email.
+- **Abuse:** login, register, reset and forgot-password are rate limited per IP. `helmet` sets security headers.
 - **Concurrency:** seat reservations lock the event row (`SELECT ... FOR UPDATE`) so
   capacity cannot be exceeded by simultaneous sign-ups.
 
@@ -204,6 +211,11 @@ lives in `server/demo/` and two policy rules.
   Restricted audiences stay planner-only (`canRestrictEvent`), because choosing
   groups or invitees needs the user and group lists. Guests are limited to 5 new
   events an hour.
+- **Word filter:** `server/lib/moderation.js` rejects guest names and the name,
+  location and description of events from non-planners (400 with a neutral field
+  error, a warn log with the field only). It matches whole words after normalizing
+  case, accents, look-alike characters and repeated letters, so "Scunthorpe" passes.
+  Terms: `server/lib/blocked-terms.json` plus an optional `BLOCKED_TERMS_FILE`.
 - **Showcase and simulation:** `server/demo/showcase.js` keeps 48 upcoming public
   events organized by `host@demo.invalid` and 160 simulated attendees
   (`bot-NNN@demo.invalid`, hidden from user lists). `server/demo/index.js` signs

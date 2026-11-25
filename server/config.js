@@ -28,6 +28,18 @@ const config = {
     // Tests run against an isolated <DB_DB>_test database created by docker compose.
     database: isTest ? `${required('DB_DB')}_test` : required('DB_DB'),
   },
+  // Base URL of the web app, used for links in emails. Must be the address
+  // users open in a browser (in development, the Vite server).
+  appUrl: (process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, ''),
+  // Outgoing mail. Without SMTP_HOST nothing is sent (see server/lib/mailer.js).
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.MAIL_FROM || 'Event Planner <no-reply@localhost>',
+  },
   // Public demo: visitors browse without an account, give a name to join or
   // create events, and their events are removed after ttlHours. Showcase
   // events with simulated attendees keep the catalogue busy. See README.
