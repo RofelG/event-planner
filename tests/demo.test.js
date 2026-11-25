@@ -100,7 +100,10 @@ describe('visitors (no session)', () => {
 
   test('see no edit controls, and may be offered Join', async () => {
     const { body } = await visitor().get(`/api/events/${ids.public}`).expect(200);
-    expect(body.permissions).toEqual({ edit: false, delete: false, join: true, leave: false, joinWaitlist: false, leaveWaitlist: false });
+    expect(body.permissions).toEqual({
+      edit: false, delete: false, join: true, leave: false, joinWaitlist: false, leaveWaitlist: false, hide: false, unhide: false,
+    });
+    expect(body).not.toHaveProperty('hidden');
     expect(body).not.toHaveProperty('groupIds');
   });
 
@@ -109,6 +112,8 @@ describe('visitors (no session)', () => {
     await visitor().post('/api/events').send(eventBody()).expect(401);
     await visitor().put(`/api/events/${ids.public}`).send(eventBody()).expect(401);
     await visitor().delete(`/api/events/${ids.public}`).expect(401);
+    await visitor().post(`/api/events/${ids.public}/hide`).expect(401);
+    await visitor().delete(`/api/events/${ids.public}/hide`).expect(401);
     await visitor().get('/api/users').expect(401);
     await visitor().get('/api/groups').expect(401);
     await visitor().get('/api/auth/me').expect(401);

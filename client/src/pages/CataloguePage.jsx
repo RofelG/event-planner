@@ -58,6 +58,7 @@ export function CataloguePage() {
   const [onlyMine, setOnlyMine] = useState(false);
   const [attendeesFor, setAttendeesFor] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [hiding, setHiding] = useState(null);
   const q = useDebounced(search.trim());
   const filters = { typeId, q, mine: onlyMine };
 
@@ -100,6 +101,11 @@ export function CataloguePage() {
   const confirmDelete = async () => {
     await actions.remove(deleting);
     setDeleting(null);
+  };
+
+  const confirmHide = async () => {
+    await actions.hide(hiding);
+    setHiding(null);
   };
 
   return (
@@ -188,7 +194,7 @@ export function CataloguePage() {
           <div key={events.dataKey} className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {shown.map((event, i) => (
               // Cards from a newly loaded page cascade from their own first card.
-              <EventCard key={event.id} index={Math.max(0, i - events.pageStart)} event={event} actions={actions} onAttendees={setAttendeesFor} onDelete={setDeleting} />
+              <EventCard key={event.id} index={Math.max(0, i - events.pageStart)} event={event} actions={actions} onAttendees={setAttendeesFor} onDelete={setDeleting} onHide={setHiding} />
             ))}
           </div>
         )}
@@ -221,6 +227,17 @@ export function CataloguePage() {
       >
         <strong className="text-ink-900">{deleting?.name}</strong> will be removed from the catalogue for everyone,
         including the {deleting?.attendeeCount} registered attendees.
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={Boolean(hiding)}
+        title="Hide this event?"
+        confirmLabel="Hide event"
+        busy={hiding && actions.isPending('hide', hiding.id)}
+        onConfirm={confirmHide}
+        onCancel={() => setHiding(null)}
+      >
+        <strong className="text-ink-900">{hiding?.name}</strong> will disappear for everyone except admins,
+        including its organizer. Nothing is deleted, and you can unhide it later.
       </ConfirmDialog>
     </div>
   );

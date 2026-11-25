@@ -22,9 +22,11 @@ export function ManageEventsPage() {
   const [includePast, setIncludePast] = useState(false);
   const [attendeesFor, setAttendeesFor] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [hiding, setHiding] = useState(null);
   const events = useApi(`/events?manageable=true${includePast ? '&past=true' : ''}`);
   const actions = useEventActions({
-    onChange: () => {},
+    // Hide and unhide return the updated event; swap it into its row.
+    onChange: (updated) => events.setData((list) => list && list.map((e) => (e.id === updated.id ? updated : e))),
     onRemove: (id) => events.setData((list) => list.filter((e) => e.id !== id)),
   });
 
@@ -63,6 +65,11 @@ export function ManageEventsPage() {
   const confirmDelete = async () => {
     await actions.remove(deleting);
     setDeleting(null);
+  };
+
+  const confirmHide = async () => {
+    await actions.hide(hiding);
+    setHiding(null);
   };
 
   return (
@@ -109,7 +116,12 @@ export function ManageEventsPage() {
                     <td className="px-4 py-3">
                       <p className="font-medium text-ink-900">{e.name}</p>
                       <p className="text-xs text-ink-500">{e.type.name} - {e.location}{isAdmin ? ` - Host: ${e.organizer.name}` : ''}</p>
-                      {hasEnded(e) && <span className="mt-1 inline-block"><Badge>Ended</Badge></span>}
+                      {(hasEnded(e) || e.hidden) && (
+                        <span className="mt-1 flex gap-1">
+                          {hasEnded(e) && <Badge>Ended</Badge>}
+                          {e.hidden && <Badge tone="danger">Hidden</Badge>}
+                        </span>
+                      )}
                     </td>
                     <td className="hidden px-4 py-3 text-ink-700 md:table-cell">{formatRange(e.start, e.end)}</td>
                     <td className="hidden px-4 py-3 sm:table-cell">
@@ -129,6 +141,12 @@ export function ManageEventsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
+                        {e.permissions.hide && (
+                          <Button size="sm" variant="ghost" onClick={() => setHiding(e)}>Hide</Button>
+                        )}
+                        {e.permissions.unhide && (
+                          <Button size="sm" variant="ghost" onClick={() => actions.unhide(e)} loading={actions.isPending('unhide', e.id)}>Unhide</Button>
+                        )}
                         {e.permissions.edit && (
                           <Link to={`/manage/${e.id}/edit`} state={modal} className="press inline-flex h-8 items-center rounded-lg px-3 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900">Edit</Link>
                         )}
@@ -156,6 +174,17 @@ export function ManageEventsPage() {
       >
         <strong className="text-ink-900">{deleting?.name}</strong> will be removed from the catalogue for everyone,
         including the {deleting?.attendeeCount} registered attendees.
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={Boolean(hiding)}
+        title="Hide this event?"
+        confirmLabel="Hide event"
+        busy={hiding && actions.isPending('hide', hiding.id)}
+        onConfirm={confirmHide}
+        onCancel={() => setHiding(null)}
+      >
+        <strong className="text-ink-900">{hiding?.name}</strong> will disappear for everyone except admins,
+        including its organizer. Nothing is deleted, and you can unhide it later.
       </ConfirmDialog>
     </div>
   );

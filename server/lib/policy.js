@@ -7,7 +7,7 @@
  * user:  { id, role: 'user' | 'planner' | 'admin' | 'visitor', groupIds: number[] }
  * event: { organizerId, visibility: 'public' | 'restricted',
  *          groupIds: number[], inviteIds: number[], end: Date | string,
- *          attendeeCount, capacity, isRegistered,
+ *          attendeeCount, capacity, isRegistered, hiddenAt: string | null,
  *          waitlistPosition (1-based or null) }
  *
  * Demo mode (DEMO_MODE=true) adds two things:
@@ -48,6 +48,8 @@ function canRestrictEvent(user) {
  */
 function canViewEvent(user, event) {
   if (isAdmin(user)) return true;
+  // Hidden by an admin: gone for everyone else, even the organizer.
+  if (event.hiddenAt) return false;
   if (event.organizerId === user.id) return true;
   if (event.visibility === 'public') return true;
 
@@ -55,6 +57,11 @@ function canViewEvent(user, event) {
   // group the event is shared with.
   if (event.inviteIds.includes(user.id)) return true;
   return event.groupIds.some((groupId) => user.groupIds.includes(groupId));
+}
+
+/** Only admins hide or unhide events (moderation). */
+function canModerateEvent(user) {
+  return isAdmin(user);
 }
 
 /** Whether the user may edit or delete the event. */
@@ -75,6 +82,7 @@ const hasEnded = (event) => new Date(event.end).getTime() <= Date.now();
 function canJoinEvent(user, event) {
   return (
     canViewEvent(user, event) &&
+    !event.hiddenAt && // admins can see a hidden event but nobody can join it
     !event.isRegistered &&
     !hasEnded(event) &&
     event.attendeeCount < event.capacity
@@ -89,6 +97,7 @@ function canLeaveEvent(user, event) {
 function canJoinWaitlist(user, event) {
   return (
     canViewEvent(user, event) &&
+    !event.hiddenAt &&
     !event.isRegistered &&
     event.waitlistPosition == null &&
     !hasEnded(event) &&
@@ -120,6 +129,8 @@ function eventPermissions(user, event) {
     delete: manage,
     join: canJoinEvent(user, event),
     leave: canLeaveEvent(user, event),
+    hide: canModerateEvent(user) && !event.hiddenAt,
+    unhide: canModerateEvent(user) && Boolean(event.hiddenAt),
     joinWaitlist: canJoinWaitlist(user, event),
     leaveWaitlist: canLeaveWaitlist(user, event),
   };
@@ -135,6 +146,7 @@ module.exports = {
   canRestrictEvent,
   canViewEvent,
   canManageEvent,
+  canModerateEvent,
   canJoinEvent,
   canLeaveEvent,
   canJoinWaitlist,

@@ -16,7 +16,7 @@ const BASE_SELECT = `
   SELECT e.event_id, e.event_name, e.event_description, e.event_location,
          e.event_date_start, e.event_date_end, e.event_max, e.event_cost,
          e.event_type, t.type_name, e.event_organizer, o.user_first AS organizer_first,
-         o.user_last AS organizer_last, e.event_visibility,
+         o.user_last AS organizer_last, e.event_visibility, e.event_hidden_at,
          (SELECT COUNT(*) FROM registration r WHERE r.event_id = e.event_id) AS attendee_count,
          EXISTS (SELECT 1 FROM registration r WHERE r.event_id = e.event_id AND r.user_id = ?) AS is_registered,
          (SELECT COUNT(*) FROM waitlist w WHERE w.event_id = e.event_id) AS waitlist_count,
@@ -48,6 +48,7 @@ function toEvent(row) {
     organizerId: row.event_organizer,
     organizer: { id: row.event_organizer, name: `${row.organizer_first} ${row.organizer_last}`.trim() },
     visibility: row.event_visibility,
+    hiddenAt: toIso(row.event_hidden_at),
     attendeeCount: Number(row.attendee_count),
     isRegistered: Boolean(row.is_registered),
     waitlistCount: Number(row.waitlist_count),
@@ -246,6 +247,16 @@ module.exports = {
       eventId,
     ]);
     return result.affectedRows > 0;
+  },
+
+  /** Moderation: hides (adminId) or restores (null) an event. Keeps the first hide time. */
+  async setHidden(eventId, adminId) {
+    const sql = adminId
+      ? `UPDATE event SET event_hidden_at = COALESCE(event_hidden_at, UTC_TIMESTAMP()),
+                          event_hidden_by = COALESCE(event_hidden_by, ?)
+          WHERE event_id = ? AND event_status = 1`
+      : 'UPDATE event SET event_hidden_at = NULL, event_hidden_by = NULL WHERE event_id = ? AND event_status = 1';
+    await query(sql, adminId ? [adminId, eventId] : [eventId]);
   },
 
   async register(eventId, userId) {

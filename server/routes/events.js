@@ -15,7 +15,7 @@ const { encodeCursor, positionOf } = require('../lib/cursor');
 const config = require('../config');
 const logger = require('../lib/logger');
 const { blockedFields } = require('../lib/moderation');
-const { notFound, forbidden, badRequest, HttpError } = require('../lib/errors');
+const { notFound, forbidden, badRequest, conflict, HttpError } = require('../lib/errors');
 
 const router = express.Router();
 
@@ -156,6 +156,18 @@ router.delete('/:id', requireUser, validate(schemas.idParam, 'params'), async (r
   res.status(204).end();
 });
 
+// POST|DELETE /api/events/:id/hide - admin moderation; see policy.canModerateEvent.
+// Non-admins get 404 for a hidden event, and 403 here for a visible one.
+for (const hide of [true, false]) {
+  router[hide ? 'post' : 'delete']('/:id/hide', requireUser, validate(schemas.idParam, 'params'), async (req, res) => {
+    const event = await loadVisible(req);
+    if (!policy.canModerateEvent(req.user)) throw forbidden('Only admins can hide or unhide events.');
+    await events.setHidden(event.id, hide ? req.user.id : null);
+    live.eventChanged(event.id, event);
+    res.json(serialize(req.user, await events.findById(req.user.id, event.id)));
+  });
+}
+
 // GET /api/events/:id/attendees - names of registered users (no emails). People who
 // hide their name appear as "Private attendee" except to managers and themselves.
 router.get('/:id/attendees', validate(schemas.idParam, 'params'), async (req, res) => {
@@ -179,6 +191,8 @@ router.get('/:id/attendees', validate(schemas.idParam, 'params'), async (req, re
 // POST /api/events/:id/registration - join the event.
 router.post('/:id/registration', requireUser, validate(schemas.idParam, 'params'), async (req, res) => {
   const event = await loadVisible(req);
+  // Only admins get this far for a hidden event, and nobody may join it.
+  if (event.hiddenAt) throw conflict('This event is hidden.');
   await events.register(event.id, req.user.id);
   live.eventChanged(event.id, event);
   res.status(201).json(serialize(req.user, await events.findById(req.user.id, event.id)));
@@ -195,6 +209,8 @@ router.delete('/:id/registration', requireUser, validate(schemas.idParam, 'param
 // POST /api/events/:id/waitlist - queue for a full event.
 router.post('/:id/waitlist', requireUser, validate(schemas.idParam, 'params'), async (req, res) => {
   const event = await loadVisible(req);
+  // Same rule as registration: only admins see a hidden event, and nobody joins it.
+  if (event.hiddenAt) throw conflict('This event is hidden.');
   await events.joinWaitlist(event.id, req.user.id);
   live.eventChanged(event.id, event);
   res.status(201).json(serialize(req.user, await events.findById(req.user.id, event.id)));

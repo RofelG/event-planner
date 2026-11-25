@@ -40,6 +40,18 @@ export function useEventActions({ onChange, onRemove }) {
         onChange(await api(`/events/${event.id}/registration`, { method: 'DELETE' }));
         notify(`You left ${event.name}.`, 'info');
       }),
+    // Admin moderation. The server returns the event as the admin sees it
+    // (hidden flag and permissions updated).
+    hide: (event) =>
+      run(`hide:${event.id}`, async () => {
+        onChange(await api(`/events/${event.id}/hide`, { method: 'POST' }));
+        notify(`${event.name} is now hidden from everyone but admins.`, 'info');
+      }),
+    unhide: (event) =>
+      run(`unhide:${event.id}`, async () => {
+        onChange(await api(`/events/${event.id}/hide`, { method: 'DELETE' }));
+        notify(`${event.name} is visible again.`, 'info');
+      }),
     joinWaitlist: async (event) => {
       if (!(await ensureSignedIn('join the waitlist'))) return;
       await run(`joinWaitlist:${event.id}`, async () => {
