@@ -109,6 +109,8 @@ database container only creates empty databases; it no longer loads a schema its
 
 New sign-ups are always members. An admin assigns roles under **Users and Groups**.
 
+Anyone can delete their own account under **Account settings**. Upcoming events they organize pass to an admin (the lowest-id other admin; the last admin cannot delete theirs), and their sign-ups, waitlist places, groups and personal details are removed. The account row stays, anonymized, because past events reference it.
+
 Each event is either **Public** (every signed-in user) or **Restricted** (members of the
 selected groups and individually invited people, plus the organizer and admins).
 Hidden events are reported as not found, so their existence is never revealed.

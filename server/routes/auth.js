@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const express = require('express');
 const rateLimit = require('express-rate-limit').default;
 const users = require('../repositories/users');
+const events = require('../repositories/events');
+const live = require('../lib/live');
 const schemas = require('../schemas');
 const config = require('../config');
 const { validate } = require('../middleware/validate');
@@ -12,7 +14,7 @@ const { hashPassword, verifyPassword, DUMMY_HASH } = require('../lib/passwords')
 const passwordResets = require('../repositories/passwordResets');
 const logger = require('../lib/logger');
 const mailer = require('../lib/mailer');
-const { isGuestEmail } = require('../demo/accounts');
+const { isGuestEmail, guestPasswordHash } = require('../demo/accounts');
 const { setAuthCookie, clearAuthCookie } = require('../lib/tokens');
 const { conflict, unauthorized, badRequest } = require('../lib/errors');
 
@@ -142,6 +144,44 @@ router.put('/password', authenticate, validate(schemas.changePassword), async (r
   const updated = await users.updatePassword(req.user.id, await hashPassword(password));
   setAuthCookie(res, updated); // keep this session alive with the new token version
   res.status(204).end();
+});
+
+// DELETE /api/auth/account - delete the signed-in user's own account. Upcoming
+// events go to an admin; seats, waitlist places, groups and personal details are
+// removed. The row stays, anonymized, because past events point at it.
+router.delete('/account', authenticate, validate(schemas.deleteAccount), async (req, res) => {
+  const { password, confirm } = req.valid.body;
+  const userId = req.user.id;
+  const invalid = (fields) => badRequest('Please correct the highlighted fields.', fields);
+
+  if (req.user.isGuest) {
+    // Guests have no password to re-enter, so an explicit confirmation stands in for it.
+    if (confirm !== true) throw invalid({ confirm: 'Please confirm' });
+  } else {
+    if (!password) throw invalid({ password: 'Password is required' });
+    if (!(await verifyPassword(password, await users.findHashById(userId)))) {
+      throw invalid({ password: 'Password is incorrect' });
+    }
+  }
+
+  // Checked before anything changes, so a refusal leaves the account untouched.
+  const adminId = await users.otherAdminId(userId);
+  const hasUpcoming = (await users.upcomingOrganizedIds(userId)).length > 0;
+  if (!adminId && (req.user.role === 'admin' || hasUpcoming)) {
+    throw conflict(
+      req.user.role === 'admin'
+        ? 'You are the only active admin. Promote someone else to admin before deleting your account.'
+        : 'Your upcoming events need an admin to take them over, and there is none. Delete those events first.'
+    );
+  }
+
+  // Frees seats and promotes people waiting; then the account itself is anonymized.
+  const seatEvents = await events.removeUsers([userId]);
+  const changed = await users.anonymize(userId, { adminId, passwordHash: await guestPasswordHash() });
+
+  clearAuthCookie(res);
+  res.status(204).end();
+  for (const id of new Set([...seatEvents, ...changed])) await live.eventChanged(id);
 });
 
 // For tests: resolves once background email work has finished.

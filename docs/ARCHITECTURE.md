@@ -80,6 +80,7 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | GET | `/api/auth/me` | Signed in | Current user, role and group ids |
 | PUT | `/api/auth/password` | Signed in | Revokes all other sessions (204) |
 | PUT | `/api/auth/settings` | Signed in (guests too, not visitors) | `{ hideName }`; returns the updated user |
+| DELETE | `/api/auth/account` | Signed in (guests too, not visitors) | `{ password }`, or `{ confirm: true }` for demo guests; anonymizes the account and hands upcoming events to an admin (204, clears the cookie); 400 field error on a wrong password, 409 when no other admin can take over |
 | GET | `/api/demo` | Public | `{ enabled, ttlHours }`, so the client can adapt to demo mode |
 | POST | `/api/demo/guest` | Public, demo mode only | `{ name }`: creates a guest and signs them in (201); 404 outside demo mode |
 | GET | `/api/events/stream` | Signed in (or visitor in demo) | Server-Sent Events: live `event`, `remove` and `ping` messages (see below) |
@@ -128,6 +129,7 @@ merges live updates only into the part of the list already loaded.
 - **Privacy:** a user can hide their name in attendee lists (`user_hide_name`). The decision is
   `canSeeAttendeeName` in `policy.js`; hidden entries carry no user id, only a key that is
   unique within one response, so they cannot be correlated across events.
+- **Account deletion:** `DELETE /api/auth/account` re-checks the password (demo guests confirm instead). `events.removeUsers` frees seats and promotes the waitlist; then `users.anonymize` runs in one transaction: upcoming events move to the lowest-id other active admin (409 if there is none), and group memberships, invites and reset tokens are deleted. The row is kept (past events reference it) as `Deleted user` with `deleted-<id>@deleted.invalid`, an unusable password hash, status 0, a bumped `token_version` (all sessions end) and a hidden name. These rows are filtered out of the admin Users list and the invite directory.
 - **Input:** every body, query and path parameter is validated with zod; unknown fields
   are dropped, which prevents mass assignment (for example a client setting its own role).
   All SQL is parameterized.

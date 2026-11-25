@@ -84,6 +84,16 @@ describe('authentication', () => {
     expect(row.user_password).not.toContain('Another-pass-9');
   });
 
+  test('register refuses the reserved .invalid domain used by internal accounts', async () => {
+    for (const email of ['guest-abc123@demo.invalid', 'deleted-7@deleted.invalid', 'someone@example.invalid']) {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ first: 'Sneaky', last: 'Person', email, password: 'Another-pass-9' })
+        .expect(400);
+      expect(res.body.fields).toHaveProperty('email');
+    }
+  });
+
   test('register cannot self-assign a role (mass assignment)', async () => {
     const res = await request(app)
       .post('/api/auth/register')
