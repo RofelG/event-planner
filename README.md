@@ -89,6 +89,9 @@ Set `DEMO_MODE=true` in `.env` to run the app as a public showcase:
   their own. Guest events, the guests and their sign-ups are removed
   `DEMO_EVENT_TTL_HOURS` (default 48) after creation. Showcase events and anything
   created by planners or admins are never removed.
+- **Word filter.** Guest names and the name, location and description of guest events
+  are checked against a list of slurs and strong profanity
+  (`server/lib/blocked-terms.json`; add more with `BLOCKED_TERMS_FILE`). Staff are not filtered.
 - **Staff still sign in** through "Staff sign in" in the nav, with the usual roles.
 
 | Variable | Default | Effect |
