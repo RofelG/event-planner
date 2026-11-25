@@ -87,6 +87,7 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | POST | `/api/events` | Planner, admin; any signed-in user in demo | 201 with `Location` header |
 | PUT | `/api/events/:id` | Organizer, planner in a shared group, admin | Full replacement |
 | DELETE | `/api/events/:id` | Organizer, planner in a shared group, admin | Soft delete (204) |
+| GET | `/api/events/:id/calendar.ics` | Can view event | Single-event iCalendar download (`text/calendar`, attachment); 404 when hidden or missing |
 | GET | `/api/events/:id/attendees` | Can view event | Names only |
 | POST | `/api/events/:id/registration` | Can view event | Join (201); 409 when full or already joined |
 | DELETE | `/api/events/:id/registration` | Can view event | Leave |
