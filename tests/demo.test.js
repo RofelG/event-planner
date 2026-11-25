@@ -241,3 +241,32 @@ describe('showcase', () => {
     expect(directory.length).toBeLessThan(BOT_COUNT);
   });
 });
+
+describe('word filter', () => {
+  test('rejects a guest name with a neutral message', async () => {
+    const res = await request(app).post('/api/demo/guest').send({ name: 'Fuck Face' }).expect(400);
+    expect(res.body.fields.name).toBe('Please choose a different name');
+    expect(JSON.stringify(res.body).toLowerCase()).not.toContain('fuck');
+    await request(app).post('/api/demo/guest').send({ name: 'F u c k' }).expect(400);
+    await becomeGuest('Scunthorpe Sussex');
+  });
+
+  test('rejects abusive name, location and description from a guest, on create and edit', async () => {
+    const { agent } = await becomeGuest('Morgan');
+    const res = await agent
+      .post('/api/events')
+      .send(eventBody({ name: 'Shit party', location: 'The b1tch bar', description: 'f.u.c.k off' }))
+      .expect(400);
+    expect(Object.keys(res.body.fields).sort()).toEqual(['description', 'location', 'name']);
+    expect(res.body.fields.name).toBe('Please remove inappropriate language');
+
+    const ok = (await agent.post('/api/events').send(eventBody({ name: 'Classic therapy session' })).expect(201)).body;
+    await agent.put(`/api/events/${ok.id}`).send(eventBody({ description: 'nigga' })).expect(400);
+    await agent.put(`/api/events/${ok.id}`).send(eventBody({ description: 'Assessment day' })).expect(200);
+  });
+
+  test('does not filter planners or admins', async () => {
+    await planner.post('/api/events').send(eventBody({ name: 'Nazi history talk' })).expect(201);
+    await admin.post('/api/events').send(eventBody({ name: 'Bastard Operator lecture' })).expect(201);
+  });
+});

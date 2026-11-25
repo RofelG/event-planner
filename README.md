@@ -55,6 +55,7 @@ is sent and the link is written to the API log at warn level instead.
 | `npm run build` | Production build of the client into `dist/` |
 | `npm start` | API only; with `NODE_ENV=production` it also serves `dist/` |
 | `npm test` | Unit and integration tests (needs the database running) |
+| `npm run test:e2e` | Browser tests with Playwright (see Browser tests) |
 | `npm run db:up` / `db:down` | Start or stop the MySQL container |
 | `npm run db:migrate` | Apply pending database migrations (also done automatically when the API starts) |
 | `npm run db:seed` | Apply migrations and add demo types, groups, users and events |
@@ -65,6 +66,31 @@ See `.env.example`. Required: `TOKEN_KEY` (at least 32 characters), `DB_HOST`,
 `DB_USER`, `DB_PASS`, `DB_DB`. Optional: `APP_URL` and the `SMTP_*` / `MAIL_FROM`
 settings for password reset email. The tests use a separate `<DB_DB>_test` database that
 docker compose creates on first start.
+
+## Browser tests
+
+`npm run test:e2e` runs Playwright (Chromium) against a real API and Vite dev server,
+started on ports 3101 and 5273 so they never clash with `npm run dev`. Install the
+browser once with `npx playwright install chromium`.
+
+The run **drops every table** in its own database, `<DB_DB>_e2e` (`event_planner_e2e`
+with the usual `.env`), and reseeds it from the `SEED_*` accounts. Your development
+database is never touched: the reset refuses any database whose name does not contain `e2e`.
+
+A fresh database container creates `event_planner_e2e` automatically. With an existing
+container, create it once (this uses `DB_ROOT_PASS` from `.env`):
+
+```powershell
+npm run db:e2e
+```
+
+Then run the tests:
+
+```powershell
+npm run test:e2e
+```
+
+After a failure, open the report with `npx playwright show-report`.
 
 ## Database schema
 
@@ -103,6 +129,9 @@ Set `DEMO_MODE=true` in `.env` to run the app as a public showcase:
   their own. Guest events, the guests and their sign-ups are removed
   `DEMO_EVENT_TTL_HOURS` (default 48) after creation. Showcase events and anything
   created by planners or admins are never removed.
+- **Word filter.** Guest names and the name, location and description of guest events
+  are checked against a list of slurs and strong profanity
+  (`server/lib/blocked-terms.json`; add more with `BLOCKED_TERMS_FILE`). Staff are not filtered.
 - **Staff still sign in** through "Staff sign in" in the nav, with the usual roles.
 
 | Variable | Default | Effect |
