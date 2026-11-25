@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useApi } from '../hooks/useApi';
 import { useEventActions } from '../hooks/useEventActions';
 import { useLiveEvents } from '../hooks/useLiveEvents';
@@ -50,6 +51,7 @@ function useSentinel(onVisible, enabled, deps) {
 
 export function CataloguePage() {
   const { user, isVisitor, canCreate } = useAuth();
+  const { notify } = useToast();
   const openEditor = useOpenEditor();
   const [typeId, setTypeId] = useState(null);
   const [search, setSearch] = useState('');
@@ -72,6 +74,11 @@ export function CataloguePage() {
     if (message.type === 'reconnected') events.reload();
     else if (message.type === 'remove') events.setItems((list) => list && list.filter((e) => e.id !== message.data.id));
     else if (message.type === 'event') {
+      // The seat came from the waitlist: this user was waiting and now has a seat.
+      const before = events.items?.find((e) => e.id === message.data.id);
+      if (before?.waitlistPosition != null && message.data.isRegistered) {
+        notify(`A seat opened up. You are now registered for ${message.data.name}.`);
+      }
       events.setItems((list) => list && mergeLiveEvent(list, message.data, filters, { complete: !events.hasMore }));
     }
   });

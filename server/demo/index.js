@@ -97,11 +97,11 @@ async function cleanup() {
   );
   if (!guests.length) return;
   const ids = guests.map((g) => g.user_id);
-  const affected = await query('SELECT DISTINCT event_id FROM registration WHERE user_id IN (?)', [ids]);
-  await query('DELETE FROM registration WHERE user_id IN (?)', [ids]);
+  // Frees their seats (promoting people on waitlists) and drops their waitlist spots.
+  const affected = await events.removeUsers(ids);
   // Deactivating (and bumping token_version) ends any session they still hold.
   await query('UPDATE `user` SET user_status = 0, token_version = token_version + 1 WHERE user_id IN (?)', [ids]);
-  for (const { event_id: eventId } of affected) await live.eventChanged(eventId);
+  for (const eventId of affected) await live.eventChanged(eventId);
 }
 
 async function maintain() {

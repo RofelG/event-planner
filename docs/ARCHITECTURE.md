@@ -89,7 +89,9 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | DELETE | `/api/events/:id` | Organizer, planner in a shared group, admin | Soft delete (204) |
 | GET | `/api/events/:id/attendees` | Can view event | Names only |
 | POST | `/api/events/:id/registration` | Can view event | Join (201); 409 when full or already joined |
-| DELETE | `/api/events/:id/registration` | Can view event | Leave |
+| DELETE | `/api/events/:id/registration` | Can view event | Leave; the first person on the waitlist takes the seat |
+| POST | `/api/events/:id/waitlist` | Can view event | Join the waitlist (201); 409 when seats are free, registered, already waiting or ended |
+| DELETE | `/api/events/:id/waitlist` | Can view event | Leave the waitlist; 404 when not on it |
 | GET | `/api/types` | Signed in (or visitor in demo) | Event types |
 | GET | `/api/users` | Planner, admin | Planners: names; admins: email, role, status, groups |
 | PUT | `/api/users/:id` | Admin | `role`, `active`, `groupIds` |
@@ -136,6 +138,23 @@ To change the schema, add the next numbered file; never edit one that has shippe
 migrations existed. MySQL DDL auto-commits, so a migration that fails halfway cannot be
 rolled back and its version is not recorded: fix the leftovers by hand, then re-run.
 Keep migrations small, one change each.
+
+### Waitlist
+Full events have a first-come, first-served waitlist (`waitlist` table, `created_at`
+with millisecond precision, ties broken by user id).
+
+- **Joining:** only for a full, not-ended event the user can see and has no seat in
+  (`policy.canJoinWaitlist`); the repository re-checks under the event row lock.
+  Registering removes the user from that event's waitlist.
+- **Promotion:** `promoteFromWaitlist` in `repositories/events.js` fills free seats in
+  order, inside the same transaction and event-row lock (`SELECT ... FOR UPDATE`) that
+  freed them. It runs after `unregister`, after an `update` that raises capacity, and
+  after `removeUsers` (demo guest cleanup), so concurrent leaves cannot over-fill an
+  event. Ended events are skipped, and deleting an event cascades its waitlist rows.
+- **Shape:** every serialized event has `waitlistCount` and, per user, `waitlistPosition`
+  (1-based or `null`); `permissions` gains `joinWaitlist` and `leaveWaitlist`. The live
+  hub computes each client's position from the ordered waitlist, like `isRegistered`.
+  A client that sees itself go from waiting to registered shows a toast.
 
 ### Live updates
 The catalogue receives changes in real time over Server-Sent Events, a one-way HTTP

@@ -46,7 +46,7 @@ let admin, planner, otherPlanner, member, outsider;
 beforeAll(async () => {
   await applySchema();
   await query('SET FOREIGN_KEY_CHECKS = 0');
-  for (const t of ['registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
+  for (const t of ['waitlist', 'registration', 'event_invite', 'event_group', 'event', 'user_group', '`group`', '`type`', '`user`']) {
     await query(`TRUNCATE TABLE ${t}`);
   }
   await query('SET FOREIGN_KEY_CHECKS = 1');
@@ -307,6 +307,145 @@ describe('registration', () => {
     const left = await member.delete(`/api/events/${event.id}/registration`).expect(200);
     expect(left.body).toMatchObject({ isRegistered: false, attendeeCount: 1 });
     await member.delete(`/api/events/${event.id}/registration`).expect(404);
+  });
+});
+
+describe('waitlist', () => {
+  const makeEvent = async (capacity, over = {}) =>
+    (await planner.post('/api/events').send(eventBody({ name: 'Waitlist', capacity, ...over })).expect(201)).body;
+  const wait = (agent, event) => agent.post(`/api/events/${event.id}/waitlist`);
+  const seated = async (event) =>
+    (await query('SELECT user_id FROM registration WHERE event_id = ? ORDER BY user_id', [event.id])).map((r) => r.user_id);
+  const waiting = async (event) =>
+    (await query('SELECT user_id FROM waitlist WHERE event_id = ? ORDER BY created_at, user_id', [event.id])).map((r) => r.user_id);
+
+  test('can only be joined while the event is full', async () => {
+    const event = await makeEvent(1);
+    const early = await wait(outsider, event).expect(409);
+    expect(early.body.error).toMatch(/join the event instead/i);
+
+    await member.post(`/api/events/${event.id}/registration`).expect(201);
+    const forOutsider = (await outsider.get(`/api/events/${event.id}`).expect(200)).body;
+    expect(forOutsider.permissions).toMatchObject({ join: false, joinWaitlist: true, leaveWaitlist: false });
+    // Registered users have a seat, so they cannot queue.
+    await wait(member, event).expect(409);
+
+    const joined = await wait(outsider, event).expect(201);
+    expect(joined.body).toMatchObject({ waitlistCount: 1, waitlistPosition: 1, isRegistered: false });
+    expect(joined.body.permissions).toMatchObject({ joinWaitlist: false, leaveWaitlist: true });
+    await wait(outsider, event).expect(409);
+  });
+
+  test('a deactivated account in line is skipped when a seat frees up', async () => {
+    const event = await makeEvent(1);
+    await member.post(`/api/events/${event.id}/registration`).expect(201);
+    const goneId = await createUser('Gone', 'user', 'gone-waiting@t.test');
+    const gone = await signIn('gone-waiting@t.test');
+    await wait(gone, event).expect(201);
+    await wait(outsider, event).expect(201);
+    await admin.put(`/api/users/${goneId}`).send({ active: false }).expect(204);
+
+    await member.delete(`/api/events/${event.id}/registration`).expect(200);
+    expect(await seated(event)).toEqual([ids.outsider]);
+  });
+
+  test('requires a session and cannot be used on ended events', async () => {
+    const event = await makeEvent(1);
+    await request(app).post(`/api/events/${event.id}/waitlist`).expect(401);
+    await member.post(`/api/events/${event.id}/registration`).expect(201);
+    await query('UPDATE event SET event_date_start = ?, event_date_end = ? WHERE event_id = ?', [
+      new Date(Date.now() - 7200000), new Date(Date.now() - 3600000), event.id,
+    ]);
+    await wait(outsider, event).expect(409);
+  });
+
+  test('positions are per user and the first in line is promoted when a seat is freed', async () => {
+    const event = await makeEvent(1);
+    await member.post(`/api/events/${event.id}/registration`).expect(201);
+    await wait(outsider, event).expect(201);
+    await wait(otherPlanner, event).expect(201);
+    await wait(admin, event).expect(201);
+
+    const view = async (agent) => (await agent.get(`/api/events/${event.id}`).expect(200)).body;
+    expect((await view(outsider)).waitlistPosition).toBe(1);
+    expect((await view(otherPlanner)).waitlistPosition).toBe(2);
+    expect((await view(admin)).waitlistPosition).toBe(3);
+    expect(await view(member)).toMatchObject({ waitlistPosition: null, waitlistCount: 3 });
+
+    const left = await member.delete(`/api/events/${event.id}/registration`).expect(200);
+    expect(left.body).toMatchObject({ isRegistered: false, attendeeCount: 1, waitlistCount: 2 });
+    expect(await seated(event)).toEqual([ids.outsider]);
+    expect(await waiting(event)).toEqual([ids.otherPlanner, ids.admin]);
+    expect(await view(outsider)).toMatchObject({ isRegistered: true, waitlistPosition: null });
+    expect((await view(admin)).waitlistPosition).toBe(2);
+  });
+
+  test('raising capacity promotes exactly as many people as there are new seats', async () => {
+    const event = await makeEvent(1);
+    await member.post(`/api/events/${event.id}/registration`).expect(201);
+    await wait(outsider, event).expect(201);
+    await wait(otherPlanner, event).expect(201);
+    await wait(admin, event).expect(201);
+
+    const updated = await planner.put(`/api/events/${event.id}`).send(eventBody({ name: 'Waitlist', capacity: 3 })).expect(200);
+    expect(updated.body).toMatchObject({ attendeeCount: 3, waitlistCount: 1 });
+    expect(await seated(event)).toEqual([ids.member, ids.outsider, ids.otherPlanner].sort((a, b) => a - b));
+    expect(await waiting(event)).toEqual([ids.admin]);
+  });
+
+  test('leaving the waitlist keeps the others in order', async () => {
+    const event = await makeEvent(1);
+    await member.post(`/api/events/${event.id}/registration`).expect(201);
+    await wait(outsider, event).expect(201);
+    await wait(admin, event).expect(201);
+    const left = await outsider.delete(`/api/events/${event.id}/waitlist`).expect(200);
+    expect(left.body).toMatchObject({ waitlistPosition: null, waitlistCount: 1 });
+    await outsider.delete(`/api/events/${event.id}/waitlist`).expect(404);
+    expect((await admin.get(`/api/events/${event.id}`).expect(200)).body.waitlistPosition).toBe(1);
+  });
+
+  test('registering removes the user from the waitlist', async () => {
+    const event = await makeEvent(1);
+    await member.post(`/api/events/${event.id}/registration`).expect(201);
+    await wait(outsider, event).expect(201);
+    // Simulate a seat freed without promotion, then a direct sign-up.
+    await query('DELETE FROM registration WHERE event_id = ?', [event.id]);
+    await outsider.post(`/api/events/${event.id}/registration`).expect(201);
+    expect(await waiting(event)).toEqual([]);
+  });
+
+  test('hidden events respond 404 for both waitlist routes', async () => {
+    const hidden = await makeEvent(1, { visibility: 'restricted', groupIds: [ids.group] });
+    await wait(outsider, hidden).expect(404);
+    await outsider.delete(`/api/events/${hidden.id}/waitlist`).expect(404);
+  });
+
+  test('concurrent leaves never over-fill the event', async () => {
+    const event = await makeEvent(2);
+    await member.post(`/api/events/${event.id}/registration`).expect(201);
+    await outsider.post(`/api/events/${event.id}/registration`).expect(201);
+    await wait(otherPlanner, event).expect(201);
+    await wait(admin, event).expect(201);
+    await Promise.all([
+      member.delete(`/api/events/${event.id}/registration`),
+      outsider.delete(`/api/events/${event.id}/registration`),
+    ]);
+    expect(await seated(event)).toEqual([ids.otherPlanner, ids.admin].sort((a, b) => a - b));
+    expect(await waiting(event)).toEqual([]);
+  });
+
+  test('concurrent leaves with a short line fill only the seats available', async () => {
+    const event = await makeEvent(3);
+    for (const a of [member, outsider, otherPlanner]) await a.post(`/api/events/${event.id}/registration`).expect(201);
+    await wait(admin, event).expect(201);
+    await Promise.all([
+      member.delete(`/api/events/${event.id}/registration`),
+      outsider.delete(`/api/events/${event.id}/registration`),
+      otherPlanner.delete(`/api/events/${event.id}/registration`),
+    ]);
+    const [{ n }] = await query('SELECT COUNT(*) AS n FROM registration WHERE event_id = ?', [event.id]);
+    expect(n).toBe(1);
+    expect(await seated(event)).toEqual([ids.admin]);
   });
 });
 

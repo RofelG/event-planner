@@ -63,7 +63,7 @@ database container only creates empty databases; it no longer loads a schema its
 
 | Role | Can do |
 | --- | --- |
-| Member (`user`) | See events they are allowed to see, join and leave them, view attendees, change their password |
+| Member (`user`) | See events they are allowed to see, join and leave them, join the waitlist of a full event (they are registered automatically when a seat frees up), view attendees, change their password |
 | Event Planner (`planner`) | Everything a member can, plus create events and edit or delete events they organize or that are shared with one of their groups |
 | Admin (`admin`) | Everything, including any event, user roles, account status and groups |
 
