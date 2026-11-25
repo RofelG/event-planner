@@ -122,7 +122,13 @@ merges live updates only into the part of the list already loaded.
   are dropped, which prevents mass assignment (for example a client setting its own role).
   All SQL is parameterized.
 - **CSRF:** SameSite=Strict cookies, plus the API rejects non-JSON write requests (415).
-- **Abuse:** login and register are rate limited per IP. `helmet` sets security headers.
+- **Password reset:** `POST /api/auth/forgot` always answers 202 and does its lookup and
+  email after responding, so neither the body nor the timing reveals whether an account
+  exists. Tokens are 32 random bytes, valid 30 minutes, single use; only their SHA-256 hash
+  is stored (`password_reset`). A new request invalidates earlier ones. Redeeming a token
+  sets the password through the same path as a password change, so all sessions are signed
+  out. Demo guests and deactivated accounts get no email.
+- **Abuse:** login, register, reset and forgot-password are rate limited per IP. `helmet` sets security headers.
 - **Concurrency:** seat reservations lock the event row (`SELECT ... FOR UPDATE`) so
   capacity cannot be exceeded by simultaneous sign-ups.
 

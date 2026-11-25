@@ -36,6 +36,19 @@ npm run dev
 
 Open http://localhost:5173 and sign in with one of the `SEED_*` accounts from `.env`.
 
+### Password reset email
+
+"Forgot your password?" sends a reset link by email. In development, start Mailpit,
+which catches all outgoing mail instead of delivering it:
+
+```powershell
+docker compose up -d mailpit
+```
+
+Open the inbox at http://localhost:8025 to find the link. `.env.example` already points
+the API at it (`SMTP_HOST=127.0.0.1`, `SMTP_PORT=1025`). If `SMTP_HOST` is empty, no mail
+is sent and the link is written to the API log at warn level instead.
+
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | API on `API_PORT` (default 3001) with reload, plus Vite on 5173 proxying `/api` |
@@ -49,7 +62,8 @@ Open http://localhost:5173 and sign in with one of the `SEED_*` accounts from `.
 ## Environment variables
 
 See `.env.example`. Required: `TOKEN_KEY` (at least 32 characters), `DB_HOST`,
-`DB_USER`, `DB_PASS`, `DB_DB`. The tests use a separate `<DB_DB>_test` database that
+`DB_USER`, `DB_PASS`, `DB_DB`. Optional: `APP_URL` and the `SMTP_*` / `MAIL_FROM`
+settings for password reset email. The tests use a separate `<DB_DB>_test` database that
 docker compose creates on first start.
 
 ## Database schema

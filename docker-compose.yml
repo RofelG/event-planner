@@ -18,5 +18,14 @@ services:
       timeout: 5s
       retries: 20
 
+  # Development only: catches outgoing email (password resets) so nothing is
+  # really sent. Start with `docker compose up -d mailpit`.
+  mailpit:
+    image: axllent/mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # web inbox
+
 volumes:
   db_data:
