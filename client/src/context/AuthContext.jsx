@@ -82,6 +82,12 @@ export function AuthProvider({ children }) {
     setAccount(null);
   }, []);
 
+  /** Deletes the account (body: { password } or, for guests, { confirm: true }) and signs out locally. */
+  const deleteAccount = useCallback(async (body) => {
+    await api('/auth/account', { method: 'DELETE', body });
+    setAccount(null);
+  }, []);
+
   const value = useMemo(() => {
     const user = account || (demo.enabled ? VISITOR : null);
     const role = user?.role;
@@ -105,9 +111,10 @@ export function AuthProvider({ children }) {
       register,
       becomeGuest,
       updateSettings,
+      deleteAccount,
       logout,
     };
-  }, [account, demo, status, expired, login, register, becomeGuest, updateSettings, logout]);
+  }, [account, demo, status, expired, login, register, becomeGuest, updateSettings, deleteAccount, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

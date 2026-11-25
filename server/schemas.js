@@ -27,10 +27,15 @@ const idList = z.array(id).max(500).default([]).transform((ids) => [...new Set(i
 const isoDate = (label) =>
   z.iso.datetime({ offset: true, error: `${label} must be a valid date and time` }).transform((s) => new Date(s));
 
+// The reserved .invalid domain marks internal accounts (demo guests and bots,
+// deleted accounts), which the app recognizes by email; nobody may sign up
+// with one and be treated as such.
+const signupEmail = email.refine((e) => !e.endsWith('.invalid'), 'Enter a valid email address');
+
 const register = z.object({
   first: name('First name'),
   last: name('Last name'),
-  email,
+  email: signupEmail,
   password: newPassword,
 });
 
@@ -49,6 +54,12 @@ const changePassword = z
 
 // Unknown fields are dropped; add new account settings here.
 const accountSettings = z.object({ hideName: z.boolean({ error: 'hideName must be true or false' }) });
+
+// Normal accounts re-enter their password; demo guests have none and confirm instead.
+const deleteAccount = z.object({
+  password: z.string().max(200).optional(),
+  confirm: z.boolean().optional(),
+});
 
 const forgotPassword = z.object({ email });
 
@@ -120,4 +131,4 @@ const userUpdate = z
   })
   .refine((d) => Object.keys(d).length > 0, 'Nothing to update');
 
-module.exports = { register, login, changePassword, forgotPassword, resetPassword, accountSettings, event, eventQuery, guest, idParam, group, userUpdate };
+module.exports = { register, login, changePassword, forgotPassword, resetPassword, accountSettings, deleteAccount, event, eventQuery, guest, idParam, group, userUpdate };

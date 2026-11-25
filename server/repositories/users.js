@@ -5,6 +5,8 @@ const { isGuestEmail } = require('../demo/accounts');
 
 // Simulated demo attendees are not people: keep them out of user lists.
 const NOT_BOT = "user_email NOT LIKE 'bot-%@demo.invalid'";
+// Deleted accounts are anonymized in place (past events still reference them).
+const NOT_DELETED = "user_email NOT LIKE 'deleted-%@deleted.invalid'";
 
 const PUBLIC_COLUMNS = 'user_id, user_first, user_last, user_email, user_role, user_status, user_hide_name, token_version';
 
@@ -84,7 +86,7 @@ module.exports = {
   /** Names only: what planners need to pick invitees. */
   async directory() {
     return query(
-      `SELECT user_id, user_first, user_last FROM \`user\` WHERE user_status = 1 AND ${NOT_BOT} ORDER BY user_last, user_first`
+      `SELECT user_id, user_first, user_last FROM \`user\` WHERE user_status = 1 AND ${NOT_BOT} AND ${NOT_DELETED} ORDER BY user_last, user_first`
     );
   },
 
@@ -94,9 +96,57 @@ module.exports = {
       `SELECT u.user_id, u.user_first, u.user_last, u.user_email, u.user_role, u.user_status,
               (SELECT JSON_ARRAYAGG(ug.group_id) FROM user_group ug WHERE ug.user_id = u.user_id) AS group_ids
          FROM \`user\` u
-        WHERE u.${NOT_BOT}
+        WHERE u.${NOT_BOT} AND u.${NOT_DELETED}
         ORDER BY u.user_last, u.user_first`
     );
+  },
+
+  /** Lowest-id active admin other than the given user: who inherits their upcoming events. */
+  async otherAdminId(userId) {
+    const [row] = await query(
+      "SELECT user_id FROM `user` WHERE user_role = 'admin' AND user_status = 1 AND user_id <> ? ORDER BY user_id ASC LIMIT 1",
+      [userId]
+    );
+    return row?.user_id;
+  },
+
+  /** Ids of upcoming (not ended, not deleted) events the user organizes. */
+  async upcomingOrganizedIds(userId) {
+    const rows = await query(
+      'SELECT event_id FROM event WHERE event_organizer = ? AND event_status = 1 AND event_date_end > UTC_TIMESTAMP()',
+      [userId]
+    );
+    return rows.map((r) => r.event_id);
+  },
+
+  /**
+   * Account deletion, in one transaction: hands upcoming events to the admin,
+   * drops groups, invites and reset tokens, and anonymizes the row. The row is
+   * kept because past events reference it. Seats and waitlist places are
+   * handled before this by events.removeUsers. Returns the affected event ids.
+   */
+  async anonymize(id, { adminId, passwordHash }) {
+    return transaction(async (conn) => {
+      const [moved] = await conn.query(
+        'SELECT event_id FROM event WHERE event_organizer = ? AND event_status = 1 AND event_date_end > UTC_TIMESTAMP() FOR UPDATE',
+        [id]
+      );
+      const eventIds = moved.map((r) => r.event_id);
+      if (eventIds.length) {
+        await conn.query('UPDATE event SET event_organizer = ? WHERE event_id IN (?)', [adminId, eventIds]);
+      }
+      const [invited] = await conn.query('SELECT event_id FROM event_invite WHERE user_id = ?', [id]);
+      await conn.query('DELETE FROM event_invite WHERE user_id = ?', [id]);
+      await conn.query('DELETE FROM user_group WHERE user_id = ?', [id]);
+      await conn.query('DELETE FROM password_reset WHERE user_id = ?', [id]);
+      await conn.query(
+        `UPDATE \`user\` SET user_first = 'Deleted user', user_last = '', user_email = ?, user_password = ?,
+                user_status = 0, user_hide_name = 1, token_version = token_version + 1
+          WHERE user_id = ?`,
+        [`deleted-${id}@deleted.invalid`, passwordHash, id]
+      );
+      return [...new Set([...eventIds, ...invited.map((r) => r.event_id)])];
+    });
   },
 
   async exists(id) {
