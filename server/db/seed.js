@@ -5,22 +5,16 @@
  * and sample events covering each visibility mode. Safe to run repeatedly.
  * Credentials come from the SEED_* variables in .env (see .env.example).
  */
-const fs = require('fs');
-const path = require('path');
 const config = require('../config');
 const { pool, query } = require('./pool');
+const { migrate } = require('./migrate');
 const { hashPassword } = require('../lib/passwords');
 
 const TYPES = ['Conference', 'Workshop', 'Social', 'Sports', 'Networking', 'Training'];
 const GROUPS = ['Staff', 'Volunteers', 'VIP'];
 
 async function applySchema() {
-  const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-  const statements = sql
-    .split(/;\s*$/m)
-    .map((s) => s.replace(/^\s*--.*$/gm, '').trim())
-    .filter(Boolean);
-  for (const statement of statements) await query(statement);
+  await migrate();
 }
 
 async function upsertUser({ first, last, email, password, role }) {

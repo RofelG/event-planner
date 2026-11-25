@@ -43,13 +43,21 @@ Open http://localhost:5173 and sign in with one of the `SEED_*` accounts from `.
 | `npm start` | API only; with `NODE_ENV=production` it also serves `dist/` |
 | `npm test` | Unit and integration tests (needs the database running) |
 | `npm run db:up` / `db:down` | Start or stop the MySQL container |
-| `npm run db:seed` | Apply the schema and add demo types, groups, users and events |
+| `npm run db:migrate` | Apply pending database migrations (also done automatically when the API starts) |
+| `npm run db:seed` | Apply migrations and add demo types, groups, users and events |
 
 ## Environment variables
 
 See `.env.example`. Required: `TOKEN_KEY` (at least 32 characters), `DB_HOST`,
 `DB_USER`, `DB_PASS`, `DB_DB`. The tests use a separate `<DB_DB>_test` database that
 docker compose creates on first start.
+
+## Database schema
+
+The schema lives in numbered SQL files in `server/db/migrations/`. The API applies any
+that are pending when it starts, and `npm run db:migrate` or `npm run db:seed` does the
+same on demand; applied versions are recorded in the `schema_migrations` table. The
+database container only creates empty databases; it no longer loads a schema itself.
 
 ## Roles and access
 
@@ -92,3 +100,9 @@ Set `DEMO_MODE=true` in `.env` to run the app as a public showcase:
 Demo mode only adds rows; it never changes existing users or events. It does add about
 160 simulated users, so point `DB_DB` at a separate database for a demo. Guests are
 limited to 10 new names per hour per IP address and 5 new events per hour.
+
+## Dependency updates
+
+Dependabot checks npm packages and GitHub Actions every Monday, configured in
+`.github/dependabot.yml`. Minor and patch npm updates are grouped into one pull request,
+while major version updates arrive as separate pull requests so each can be reviewed on its own.
