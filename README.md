@@ -42,6 +42,7 @@ Open http://localhost:5173 and sign in with one of the `SEED_*` accounts from `.
 | `npm run build` | Production build of the client into `dist/` |
 | `npm start` | API only; with `NODE_ENV=production` it also serves `dist/` |
 | `npm test` | Unit and integration tests (needs the database running) |
+| `npm run test:e2e` | Browser tests with Playwright (see Browser tests) |
 | `npm run db:up` / `db:down` | Start or stop the MySQL container |
 | `npm run db:seed` | Apply the schema and add demo types, groups, users and events |
 
@@ -50,6 +51,31 @@ Open http://localhost:5173 and sign in with one of the `SEED_*` accounts from `.
 See `.env.example`. Required: `TOKEN_KEY` (at least 32 characters), `DB_HOST`,
 `DB_USER`, `DB_PASS`, `DB_DB`. The tests use a separate `<DB_DB>_test` database that
 docker compose creates on first start.
+
+## Browser tests
+
+`npm run test:e2e` runs Playwright (Chromium) against a real API and Vite dev server,
+started on ports 3101 and 5273 so they never clash with `npm run dev`. Install the
+browser once with `npx playwright install chromium`.
+
+The run **drops every table** in its own database, `<DB_DB>_e2e` (`event_planner_e2e`
+with the usual `.env`), and reseeds it from the `SEED_*` accounts. Your development
+database is never touched: the reset refuses any database whose name does not contain `e2e`.
+
+A fresh database container creates `event_planner_e2e` automatically. With an existing
+container, create it once (this uses `DB_ROOT_PASS` from `.env`):
+
+```powershell
+npm run db:e2e
+```
+
+Then run the tests:
+
+```powershell
+npm run test:e2e
+```
+
+After a failure, open the report with `npx playwright show-report`.
 
 ## Roles and access
 

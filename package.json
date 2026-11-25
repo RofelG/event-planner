@@ -17,7 +17,9 @@
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:seed": "node server/db/seed.js",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "test:e2e": "playwright test",
+    "db:e2e": "node e2e/create-db.js"
   },
   "jest": {
     "testEnvironment": "node",
@@ -37,6 +39,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@vitejs/plugin-react": "^6.3.0",
     "autoprefixer": "^10.7.0",
     "concurrently": "^10.0.7",
