@@ -13,6 +13,8 @@ const { requireUser } = require('../middleware/auth');
 const ical = require('../lib/ical');
 const { encodeCursor, positionOf } = require('../lib/cursor');
 const config = require('../config');
+const logger = require('../lib/logger');
+const { blockedFields } = require('../lib/moderation');
 const { notFound, forbidden, badRequest, HttpError } = require('../lib/errors');
 
 const router = express.Router();
@@ -26,6 +28,19 @@ function checkAudience(user, data) {
   if (data.visibility !== 'public' || data.groupIds.length || data.inviteIds.length) {
     throw badRequest('Please correct the highlighted fields.', { visibility: 'Only planners can restrict who sees an event' });
   }
+}
+
+/**
+ * Text from non-planners (demo guests) is shown to other visitors, so screen it.
+ * Planners and admins are trusted staff. The response never says which term matched.
+ */
+const BLOCKED_MESSAGE = 'Please remove inappropriate language';
+function checkLanguage(user, data) {
+  if (policy.isPlanner(user)) return;
+  const fields = blockedFields({ name: data.name, location: data.location, description: data.description });
+  if (!fields.length) return;
+  logger.warn({ userId: user.id, fields }, 'Event text rejected by word filter');
+  throw badRequest('Please correct the highlighted fields.', Object.fromEntries(fields.map((f) => [f, BLOCKED_MESSAGE])));
 }
 
 /** Loads an event the user may see, or responds 404 (never 403, to avoid leaking existence). */
@@ -108,6 +123,7 @@ router.post('/', requireUser, validate(schemas.event), async (req, res) => {
   const data = req.valid.body;
   if (data.end <= new Date()) throw badRequest('Please correct the highlighted fields.', { end: 'End must be in the future' });
   checkAudience(req.user, data);
+  checkLanguage(req.user, data);
   if (config.demo.enabled && !policy.isPlanner(req.user)) {
     if ((await events.countCreatedSince(req.user.id, 1)) >= DEMO_CREATE_PER_HOUR) {
       throw new HttpError(429, `You can create up to ${DEMO_CREATE_PER_HOUR} events an hour in the demo.`);
@@ -124,6 +140,7 @@ router.put('/:id', requireUser, validate(schemas.idParam, 'params'), validate(sc
   const event = await loadVisible(req);
   if (!policy.canManageEvent(req.user, event)) throw forbidden('Only the organizer, a planner in a group it is shared with, or an admin can edit this event.');
   checkAudience(req.user, req.valid.body);
+  checkLanguage(req.user, req.valid.body);
   await checkReferences(req.valid.body);
   const updated = await events.update(event.id, req.user.id, req.valid.body);
   live.eventChanged(event.id, event);

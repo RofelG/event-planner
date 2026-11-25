@@ -201,6 +201,11 @@ lives in `server/demo/` and two policy rules.
   Restricted audiences stay planner-only (`canRestrictEvent`), because choosing
   groups or invitees needs the user and group lists. Guests are limited to 5 new
   events an hour.
+- **Word filter:** `server/lib/moderation.js` rejects guest names and the name,
+  location and description of events from non-planners (400 with a neutral field
+  error, a warn log with the field only). It matches whole words after normalizing
+  case, accents, look-alike characters and repeated letters, so "Scunthorpe" passes.
+  Terms: `server/lib/blocked-terms.json` plus an optional `BLOCKED_TERMS_FILE`.
 - **Showcase and simulation:** `server/demo/showcase.js` keeps 48 upcoming public
   events organized by `host@demo.invalid` and 160 simulated attendees
   (`bot-NNN@demo.invalid`, hidden from user lists). `server/demo/index.js` signs
