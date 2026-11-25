@@ -35,7 +35,9 @@ app.use(
     autoLogging: { ignore: (req) => QUIET_PATHS.has(req.url.split('?')[0]) },
     // Only id, method and url: headers (cookies) stay out of the log entirely.
     serializers: {
-      req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+      // Password reset links carry a live token in the query string; in production
+      // Express serves /reset-password?token=... itself, so mask it in the log.
+      req: (req) => ({ id: req.id, method: req.method, url: req.url.replace(/([?&]token=)[^&#]*/gi, '$1[Redacted]') }),
       res: (res) => ({ statusCode: res.statusCode }),
     },
     customLogLevel: (req, res, err) => {

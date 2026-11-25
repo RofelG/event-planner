@@ -18,6 +18,15 @@ module.exports = {
     return row;
   },
 
+  /** No password hash: for flows that only need to know the account exists. */
+  async findActiveByEmail(email) {
+    const [row] = await query(
+      `SELECT ${PUBLIC_COLUMNS} FROM \`user\` WHERE user_email = ? AND user_status = 1 LIMIT 1`,
+      [email]
+    );
+    return row;
+  },
+
   async findActiveById(id) {
     const [row] = await query(
       `SELECT ${PUBLIC_COLUMNS} FROM \`user\` WHERE user_id = ? AND user_status = 1 LIMIT 1`,
