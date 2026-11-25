@@ -84,6 +84,18 @@ function canLeaveEvent(user, event) {
   return canViewEvent(user, event) && event.isRegistered && !hasEnded(event);
 }
 
+/**
+ * Whether the viewer may see this attendee's real name and id in an attendee
+ * list. People who chose to hide their name are visible only to themselves and
+ * to those who manage the event (organizer, planner in a shared group, admin).
+ * attendee: { id, hideName }
+ */
+function canSeeAttendeeName(viewer, event, attendee) {
+  if (!attendee.hideName) return true;
+  if (!isVisitor(viewer) && viewer.id === attendee.id) return true;
+  return canManageEvent(viewer, event);
+}
+
 /** The permissions object sent to the client so it can show or hide controls. */
 function eventPermissions(user, event) {
   const manage = canManageEvent(user, event);
@@ -107,6 +119,7 @@ module.exports = {
   canManageEvent,
   canJoinEvent,
   canLeaveEvent,
+  canSeeAttendeeName,
   hasEnded,
   eventPermissions,
 };

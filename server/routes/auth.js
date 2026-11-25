@@ -125,6 +125,13 @@ router.get('/me', authenticate, (req, res) => {
   res.json(req.user);
 });
 
+// PUT /api/auth/settings - account settings (currently the privacy flag). Demo
+// guests may use it; visitors never reach it because authenticate rejects them.
+router.put('/settings', authenticate, validate(schemas.accountSettings), async (req, res) => {
+  const updated = await users.updateSettings(req.user.id, req.valid.body);
+  res.json(await me(updated));
+});
+
 // PUT /api/auth/password - change password; signs out every other session.
 router.put('/password', authenticate, validate(schemas.changePassword), async (req, res) => {
   const { current, password } = req.valid.body;

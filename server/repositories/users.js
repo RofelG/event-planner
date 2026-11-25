@@ -6,7 +6,7 @@ const { isGuestEmail } = require('../demo/accounts');
 // Simulated demo attendees are not people: keep them out of user lists.
 const NOT_BOT = "user_email NOT LIKE 'bot-%@demo.invalid'";
 
-const PUBLIC_COLUMNS = 'user_id, user_first, user_last, user_email, user_role, user_status, token_version';
+const PUBLIC_COLUMNS = 'user_id, user_first, user_last, user_email, user_role, user_status, user_hide_name, token_version';
 
 module.exports = {
   /** Includes the password hash; only used by the login and password routes. */
@@ -59,6 +59,11 @@ module.exports = {
       'UPDATE `user` SET user_password = ?, token_version = token_version + 1 WHERE user_id = ?',
       [passwordHash, id]
     );
+    return this.findActiveById(id);
+  },
+
+  async updateSettings(id, { hideName }) {
+    await query('UPDATE `user` SET user_hide_name = ? WHERE user_id = ?', [hideName ? 1 : 0, id]);
     return this.findActiveById(id);
   },
 
@@ -133,6 +138,7 @@ module.exports = {
       role: row.user_role,
       // Demo visitors who gave a name; they have no password to manage.
       isGuest: isGuestEmail(row.user_email),
+      hideName: Boolean(row.user_hide_name),
     };
   },
 };

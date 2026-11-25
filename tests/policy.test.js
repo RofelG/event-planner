@@ -102,3 +102,33 @@ describe('join and leave', () => {
     expect(policy.canLeaveEvent(user(), event({ isRegistered: true, end: past }))).toBe(false);
   });
 });
+
+describe('canSeeAttendeeName', () => {
+  const hidden = { id: 50, hideName: true };
+  const open = { id: 51, hideName: false };
+
+  test('people who did not hide their name are always visible', () => {
+    expect(policy.canSeeAttendeeName(user(), event(), open)).toBe(true);
+    expect(policy.canSeeAttendeeName(policy.VISITOR, event(), open)).toBe(true);
+  });
+
+  test('hidden names are masked for members and visitors', () => {
+    expect(policy.canSeeAttendeeName(user(), event(), hidden)).toBe(false);
+    expect(policy.canSeeAttendeeName(policy.VISITOR, event(), hidden)).toBe(false);
+  });
+
+  test('a hidden person still sees themself', () => {
+    expect(policy.canSeeAttendeeName(user({ id: 50 }), event(), hidden)).toBe(true);
+  });
+
+  test('admins, organizers and planners in a shared group see hidden names', () => {
+    expect(policy.canSeeAttendeeName(user({ role: 'admin' }), event(), hidden)).toBe(true);
+    expect(policy.canSeeAttendeeName(user({ id: 1, role: 'planner' }), event(), hidden)).toBe(true);
+    expect(policy.canSeeAttendeeName(user({ role: 'planner', groupIds: [3] }), event({ groupIds: [3] }), hidden)).toBe(true);
+  });
+
+  test('an unrelated planner or a demoted organizer does not', () => {
+    expect(policy.canSeeAttendeeName(user({ role: 'planner' }), event(), hidden)).toBe(false);
+    expect(policy.canSeeAttendeeName(user({ id: 1, role: 'user' }), event(), hidden)).toBe(false);
+  });
+});

@@ -79,6 +79,7 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | POST | `/api/auth/logout` | Public | Clears the session cookie (204) |
 | GET | `/api/auth/me` | Signed in | Current user, role and group ids |
 | PUT | `/api/auth/password` | Signed in | Revokes all other sessions (204) |
+| PUT | `/api/auth/settings` | Signed in (guests too, not visitors) | `{ hideName }`; returns the updated user |
 | GET | `/api/demo` | Public | `{ enabled, ttlHours }`, so the client can adapt to demo mode |
 | POST | `/api/demo/guest` | Public, demo mode only | `{ name }`: creates a guest and signs them in (201); 404 outside demo mode |
 | GET | `/api/events/stream` | Signed in (or visitor in demo) | Server-Sent Events: live `event`, `remove` and `ping` messages (see below) |
@@ -88,7 +89,7 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | PUT | `/api/events/:id` | Organizer, planner in a shared group, admin | Full replacement |
 | DELETE | `/api/events/:id` | Organizer, planner in a shared group, admin | Soft delete (204) |
 | GET | `/api/events/:id/calendar.ics` | Can view event | Single-event iCalendar download (`text/calendar`, attachment); 404 when hidden or missing |
-| GET | `/api/events/:id/attendees` | Can view event | Names only |
+| GET | `/api/events/:id/attendees` | Can view event | Names only; users with `hideName` appear as "Private attendee" (`private: true`, no real id) unless the viewer manages the event or is that user |
 | POST | `/api/events/:id/registration` | Can view event | Join (201); 409 when full or already joined |
 | DELETE | `/api/events/:id/registration` | Can view event | Leave |
 | GET | `/api/types` | Signed in (or visitor in demo) | Event types |
@@ -119,6 +120,9 @@ merges live updates only into the part of the list already loaded.
 - **Authorization:** planners manage events they organize or that are shared with one of their groups; admins manage all. Role and group membership are read from the database on every
   request, so changes apply immediately. All rules live in `policy.js`. Events a user
   cannot see return 404 from every endpoint (detail, attendees, registration).
+- **Privacy:** a user can hide their name in attendee lists (`user_hide_name`). The decision is
+  `canSeeAttendeeName` in `policy.js`; hidden entries carry no user id, only a key that is
+  unique within one response, so they cannot be correlated across events.
 - **Input:** every body, query and path parameter is validated with zod; unknown fields
   are dropped, which prevents mass assignment (for example a client setting its own role).
   All SQL is parameterized.
