@@ -66,3 +66,29 @@ selected groups and individually invited people, plus the organizer and admins).
 Hidden events are reported as not found, so their existence is never revealed.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the API reference and security model.
+
+## Demo mode
+
+Set `DEMO_MODE=true` in `.env` to run the app as a public showcase:
+
+- **No account needed.** Visitors open the catalogue straight away and see public events.
+  The first time they join or create an event, they're asked for their name. That
+  creates a guest with no password.
+- **Live activity.** Dozens of showcase events, organized by "Demo Host", are created
+  and topped up as they end. About 160 simulated attendees join and leave them a few
+  times a second, so seat counts change in real time.
+- **Short-lived visitor data.** Guests can create public events and edit or delete
+  their own. Guest events, the guests and their sign-ups are removed
+  `DEMO_EVENT_TTL_HOURS` (default 48) after creation. Showcase events and anything
+  created by planners or admins are never removed.
+- **Staff still sign in** through "Staff sign in" in the nav, with the usual roles.
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `DEMO_MODE` | `false` | Turns demo mode on |
+| `DEMO_EVENT_TTL_HOURS` | `48` | How long guest events and guests last |
+| `DEMO_SIMULATE` | `true` | Set to `false` to stop the simulated sign-ups |
+
+Demo mode only adds rows; it never changes existing users or events. It does add about
+160 simulated users, so point `DB_DB` at a separate database for a demo. Guests are
+limited to 10 new names per hour per IP address and 5 new events per hour.

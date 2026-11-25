@@ -4,19 +4,40 @@
  * Access-control policy. Every permission decision in the API goes through
  * these pure functions so the rules live in one place and are unit tested.
  *
- * user:  { id, role: 'user' | 'planner' | 'admin', groupIds: number[] }
+ * user:  { id, role: 'user' | 'planner' | 'admin' | 'visitor', groupIds: number[] }
  * event: { organizerId, visibility: 'public' | 'restricted',
  *          groupIds: number[], inviteIds: number[], end: Date | string,
  *          attendeeCount, capacity, isRegistered }
+ *
+ * Demo mode (DEMO_MODE=true) adds two things:
+ *   - visitors: people browsing without a session. They are VISITOR below and
+ *     see public events only (they are in no group and on no invite list).
+ *   - every signed-in user may create public events and manage their own.
  */
+
+const config = require('../config');
 
 const ROLES = Object.freeze(['user', 'planner', 'admin']);
 
+/** Demo-mode principal for requests without a session. Never matches a user id. */
+const VISITOR = Object.freeze({ id: 0, role: 'visitor', groupIds: Object.freeze([]), isVisitor: true });
+
 const isAdmin = (user) => user.role === 'admin';
 const isPlanner = (user) => user.role === 'planner' || isAdmin(user);
+const isVisitor = (user) => user.role === 'visitor';
+const demoMode = () => config.demo.enabled;
 
-/** Planners and admins can open the event-planning side and create events. */
+/**
+ * Planners and admins can open the event-planning side and create events. In
+ * demo mode anyone signed in (including a named guest) can create public ones.
+ */
 function canCreateEvent(user) {
+  if (isPlanner(user)) return true;
+  return demoMode() && !isVisitor(user);
+}
+
+/** Only planners and admins choose restricted audiences (groups, invitees). */
+function canRestrictEvent(user) {
   return isPlanner(user);
 }
 
@@ -38,6 +59,8 @@ function canViewEvent(user, event) {
 /** Whether the user may edit or delete the event. */
 function canManageEvent(user, event) {
   if (isAdmin(user)) return true;
+  // Demo mode: anyone who created an event may edit or delete it.
+  if (demoMode() && !isVisitor(user) && event.organizerId === user.id) return true;
   // Only planners manage events; a demoted user loses control of events they organized.
   if (!isPlanner(user)) return false;
   // Planners manage events they organize, plus events shared with a group they
@@ -74,9 +97,12 @@ function eventPermissions(user, event) {
 
 module.exports = {
   ROLES,
+  VISITOR,
   isAdmin,
   isPlanner,
+  isVisitor,
   canCreateEvent,
+  canRestrictEvent,
   canViewEvent,
   canManageEvent,
   canJoinEvent,

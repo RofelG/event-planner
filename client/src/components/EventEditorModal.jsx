@@ -11,7 +11,6 @@ import { Checkbox, Select, TextArea, TextInput } from './ui/Field';
 import { Alert, Spinner } from './ui/Feedback';
 import { ConfirmDialog, Modal } from './ui/Modal';
 
-const PLANNERS = ['planner', 'admin'];
 const FORM_ID = 'event-editor-form';
 
 const blank = {
@@ -93,28 +92,31 @@ function InviteePicker({ people, selected, onChange, error }) {
  * there is no previous page, so App shows Manage events underneath instead.
  */
 export function EventEditorRoute() {
-  const { user } = useAuth();
+  const { user, signedIn, isPlanner, canCreate } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   // The page-level guards (RequireAuth, RequireRole) handle sign-in and access
-  // messages; the modal only appears for planners and admins.
-  if (!user || !PLANNERS.includes(user.role)) return null;
+  // messages. The modal appears for planners and admins, and in demo mode for
+  // anyone with a session (a visitor gives a name before it opens).
+  if (!user || !signedIn || !canCreate) return null;
 
   const close = () => {
     if (location.state?.background) navigate(-1);
-    else navigate('/manage', { replace: true });
+    else navigate(isPlanner ? '/manage' : '/', { replace: true });
   };
-  return <EventEditorModal onClose={close} />;
+  return <EventEditorModal onClose={close} canRestrict={isPlanner} />;
 }
 
-function EventEditorModal({ onClose }) {
+/** canRestrict: planners and admins choose audiences; demo guests create public events only. */
+function EventEditorModal({ onClose, canRestrict }) {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const { notify } = useToast();
 
   const types = useApi('/types');
-  const groups = useApi('/groups');
-  const people = useApi('/users');
+  // The group and user lists are only for planners choosing an audience.
+  const groups = useApi(canRestrict ? '/groups' : null);
+  const people = useApi(canRestrict ? '/users' : null);
   const existing = useApi(isEdit ? `/events/${id}` : null);
 
   const [form, setForm] = useState(blank);
@@ -268,6 +270,11 @@ function EventEditorModal({ onClose }) {
               </div>
             </Section>
 
+            {!canRestrict ? (
+              <Section title="Who can see it" description="Everyone browsing the demo can see and join your event.">
+                <p className="text-sm text-ink-600">Restricting an event to groups or invited people is available to event planners.</p>
+              </Section>
+            ) : (
             <Section title="Who can see it" description="Restricted events are hidden from everyone outside the chosen audience.">
               <fieldset className="grid gap-3 sm:grid-cols-2">
                 <legend className="sr-only">Visibility</legend>
@@ -306,6 +313,7 @@ function EventEditorModal({ onClose }) {
                 </div>
               )}
             </Section>
+            )}
           </form>
         )}
       </Modal>

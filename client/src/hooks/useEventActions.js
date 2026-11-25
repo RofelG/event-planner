@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { useToast } from '../context/ToastContext';
+import { useEnsureSignedIn } from '../context/GuestContext';
 
 /**
  * Join / leave / delete actions shared by the catalogue and the manage page.
@@ -9,6 +10,7 @@ import { useToast } from '../context/ToastContext';
  */
 export function useEventActions({ onChange, onRemove }) {
   const { notify } = useToast();
+  const ensureSignedIn = useEnsureSignedIn();
   const [pending, setPending] = useState(null); // `${action}:${id}`
 
   const run = async (key, fn) => {
@@ -24,11 +26,15 @@ export function useEventActions({ onChange, onRemove }) {
 
   return {
     isPending: (action, id) => pending === `${action}:${id}`,
-    join: (event) =>
-      run(`join:${event.id}`, async () => {
+    join: async (event) => {
+      // Demo visitors give their name first (before the button shows as busy);
+      // cancelling the prompt does nothing.
+      if (!(await ensureSignedIn('join events'))) return;
+      await run(`join:${event.id}`, async () => {
         onChange(await api(`/events/${event.id}/registration`, { method: 'POST' }));
         notify(`You are registered for ${event.name}.`);
-      }),
+      });
+    },
     leave: (event) =>
       run(`leave:${event.id}`, async () => {
         onChange(await api(`/events/${event.id}/registration`, { method: 'DELETE' }));

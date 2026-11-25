@@ -37,4 +37,4 @@ export const initials = (name) =>
     .map((p) => p[0].toUpperCase())
     .join('');
 
-export const roleLabel = { user: 'Member', planner: 'Event Planner', admin: 'Admin' };
+export const roleLabel = { user: 'Member', planner: 'Event Planner', admin: 'Admin', visitor: 'Visitor' };

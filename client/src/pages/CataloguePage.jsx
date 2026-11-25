@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { useEventActions } from '../hooks/useEventActions';
 import { useLiveEvents } from '../hooks/useLiveEvents';
+import { useOpenEditor } from '../hooks/useOpenEditor';
+import { usePagedEvents } from '../hooks/usePagedEvents';
 import { mergeLiveEvent } from '../lib/liveMerge';
 import { LiveIndicator } from '../components/LiveIndicator';
 import { EventCard, EventCardSkeleton } from '../components/EventCard';
 import { AttendeesModal } from '../components/AttendeesModal';
 import { ConfirmDialog } from '../components/ui/Modal';
-import { Alert, EmptyState } from '../components/ui/Feedback';
+import { Alert, EmptyState, Spinner } from '../components/ui/Feedback';
 import { Button } from '../components/ui/Button';
 
 function useDebounced(value, delay = 300) {
@@ -26,38 +27,58 @@ const chip = (active) =>
     active ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-200 bg-surface text-ink-700 hover:border-ink-300 hover:bg-ink-50'
   }`;
 
+/**
+ * Calls onVisible when the returned element scrolls within 600px of the
+ * viewport. Re-arms whenever `deps` change, so a page that still leaves the
+ * sentinel on screen triggers the next load.
+ */
+function useSentinel(onVisible, enabled, deps) {
+  const ref = useRef(null);
+  const latest = useRef(onVisible);
+  latest.current = onVisible;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !enabled || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver((entries) => entries[0].isIntersecting && latest.current(), { rootMargin: '600px 0px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+    // `deps` is spread in on purpose: re-observing fires the callback again if
+    // the sentinel is still in view after a page loads.
+  }, [enabled, ...deps]);
+  return ref;
+}
+
 export function CataloguePage() {
-  const { user, isPlanner } = useAuth();
-  const location = useLocation();
+  const { user, isVisitor, canCreate } = useAuth();
+  const openEditor = useOpenEditor();
   const [typeId, setTypeId] = useState(null);
   const [search, setSearch] = useState('');
   const [onlyMine, setOnlyMine] = useState(false);
   const [attendeesFor, setAttendeesFor] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const q = useDebounced(search.trim());
+  const filters = { typeId, q, mine: onlyMine };
 
   const types = useApi('/types');
-  const path = useMemo(() => {
-    const params = new URLSearchParams();
-    if (typeId) params.set('type', typeId);
-    if (q) params.set('q', q);
-    const s = params.toString();
-    return `/events${s ? `?${s}` : ''}`;
-  }, [typeId, q]);
-  const events = useApi(path);
+  const events = usePagedEvents(filters);
 
-  const replace = (updated) => events.setData((list) => list.map((e) => (e.id === updated.id ? updated : e)));
-  const drop = (id) => events.setData((list) => list.filter((e) => e.id !== id));
+  const replace = (updated) =>
+    events.setItems((list) => mergeLiveEvent(list, updated, filters, { complete: !events.hasMore }));
+  const drop = (id) => events.setItems((list) => list.filter((e) => e.id !== id));
   const actions = useEventActions({ onChange: replace, onRemove: drop });
 
   // Seats taken, edits, new and removed events arrive from the live stream.
   useLiveEvents((message) => {
     if (message.type === 'reconnected') events.reload();
-    else if (message.type === 'remove') events.setData((list) => list && list.filter((e) => e.id !== message.data.id));
-    else if (message.type === 'event') events.setData((list) => list && mergeLiveEvent(list, message.data, { typeId, q }));
+    else if (message.type === 'remove') events.setItems((list) => list && list.filter((e) => e.id !== message.data.id));
+    else if (message.type === 'event') {
+      events.setItems((list) => list && mergeLiveEvent(list, message.data, filters, { complete: !events.hasMore }));
+    }
   });
 
-  const shown = (events.data || []).filter((e) => !onlyMine || e.isRegistered);
+  const sentinel = useSentinel(events.loadMore, events.hasMore && !events.loadingMore, [events.items?.length]);
+
+  const shown = events.items || [];
   const filtered = Boolean(typeId || q || onlyMine);
 
   const confirmDelete = async () => {
@@ -73,12 +94,18 @@ export function CataloguePage() {
             <h1 className="text-2xl font-semibold text-ink-900 sm:text-3xl">Event catalogue</h1>
             <LiveIndicator />
           </div>
-          <p className="mt-1 text-sm text-ink-500">Welcome, {user.first}. Find an event and reserve your seat.</p>
+          <p className="mt-1 text-sm text-ink-500">
+            {isVisitor ? 'Find an event and reserve your seat.' : `Welcome, ${user.first}. Find an event and reserve your seat.`}
+          </p>
         </div>
-        {isPlanner && (
-          <Link to="/manage/new" state={{ background: location }} className="press inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 dark:hover:bg-brand-600 dark:hover:brightness-90 sm:hidden">
+        {canCreate && (
+          <button
+            type="button"
+            onClick={() => openEditor()}
+            className="press inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 dark:hover:bg-brand-600 dark:hover:brightness-90 sm:hidden"
+          >
             Create event
-          </Link>
+          </button>
         )}
       </div>
 
@@ -101,10 +128,13 @@ export function CataloguePage() {
             </button>
           ))}
         </div>
-        <label className="flex shrink-0 items-center gap-2 text-sm text-ink-700 lg:ml-auto">
-          <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
-          Only events I joined
-        </label>
+        {/* Visitors have not joined anything yet. */}
+        {!isVisitor && (
+          <label className="flex shrink-0 items-center gap-2 text-sm text-ink-700 lg:ml-auto">
+            <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+            Only events I joined
+          </label>
+        )}
       </div>
 
       <section className="mt-6" aria-live="polite" aria-busy={events.loading}>
@@ -114,13 +144,13 @@ export function CataloguePage() {
           </Alert>
         )}
 
-        {events.loading && !events.data && (
+        {events.loading && !events.items && (
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2].map((i) => <EventCardSkeleton key={i} />)}
           </div>
         )}
 
-        {events.data && shown.length === 0 && (
+        {events.items && shown.length === 0 && (
           <EmptyState
             title={filtered ? 'No events match your filters' : 'No upcoming events yet'}
             action={filtered && (
@@ -134,10 +164,27 @@ export function CataloguePage() {
         {shown.length > 0 && (
           // Keyed by the result set, so the cards cascade in again when a new
           // filter result lands, not while the old list is still showing.
-          <div key={`${events.dataPath}|${onlyMine}`} className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <div key={events.dataKey} className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {shown.map((event, i) => (
-              <EventCard key={event.id} index={i} event={event} actions={actions} onAttendees={setAttendeesFor} onDelete={setDeleting} />
+              // Cards from a newly loaded page cascade from their own first card.
+              <EventCard key={event.id} index={Math.max(0, i - events.pageStart)} event={event} actions={actions} onAttendees={setAttendeesFor} onDelete={setDeleting} />
             ))}
+          </div>
+        )}
+
+        {/* Infinite scroll: loads the next page as this comes into view. The
+            button is the fallback for keyboard users and older browsers. */}
+        {shown.length > 0 && (
+          <div ref={sentinel} className="mt-8 flex justify-center text-sm text-ink-500">
+            {events.hasMore ? (
+              events.loadingMore ? (
+                <span className="inline-flex items-center gap-2"><Spinner className="h-4 w-4" /> Loading more events</span>
+              ) : (
+                <Button variant="secondary" onClick={events.loadMore}>Load more events</Button>
+              )
+            ) : (
+              <span>You have reached the end of the list.</span>
+            )}
           </div>
         )}
       </section>

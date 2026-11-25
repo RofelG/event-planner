@@ -57,6 +57,7 @@ server/
   index.js              Starts the HTTP server
   config.js             Validated environment configuration
   db/                   Pool, schema.sql, seed script
+  demo/                 Demo mode: accounts, showcase data, simulation and cleanup
   lib/policy.js         All access-control rules (pure functions)
   lib/live.js           Live update hub: open streams and per-user fan-out
   lib/serialize.js      Event response shape, shared by REST and the stream
@@ -77,16 +78,18 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 | POST | `/api/auth/logout` | Public | Clears the session cookie (204) |
 | GET | `/api/auth/me` | Signed in | Current user, role and group ids |
 | PUT | `/api/auth/password` | Signed in | Revokes all other sessions (204) |
-| GET | `/api/events/stream` | Signed in | Server-Sent Events: live `event` and `remove` messages (see below) |
-| GET | `/api/events` | Signed in | Visible events only. Query: `type`, `q`, `past=true`, `manageable=true` |
-| GET | `/api/events/:id` | Signed in | 404 when hidden or deleted |
-| POST | `/api/events` | Planner, admin | 201 with `Location` header |
+| GET | `/api/demo` | Public | `{ enabled, ttlHours }`, so the client can adapt to demo mode |
+| POST | `/api/demo/guest` | Public, demo mode only | `{ name }`: creates a guest and signs them in (201); 404 outside demo mode |
+| GET | `/api/events/stream` | Signed in (or visitor in demo) | Server-Sent Events: live `event`, `remove` and `ping` messages (see below) |
+| GET | `/api/events` | Signed in (or visitor in demo) | Visible events only. Query: `type`, `q`, `mine=true`, `past=true`, `manageable=true`. With `limit` (1-50) the response is `{ items, nextCursor }`; pass `cursor` for the next page |
+| GET | `/api/events/:id` | Signed in (or visitor in demo) | 404 when hidden or deleted |
+| POST | `/api/events` | Planner, admin; any signed-in user in demo | 201 with `Location` header |
 | PUT | `/api/events/:id` | Organizer, planner in a shared group, admin | Full replacement |
 | DELETE | `/api/events/:id` | Organizer, planner in a shared group, admin | Soft delete (204) |
 | GET | `/api/events/:id/attendees` | Can view event | Names only |
 | POST | `/api/events/:id/registration` | Can view event | Join (201); 409 when full or already joined |
 | DELETE | `/api/events/:id/registration` | Can view event | Leave |
-| GET | `/api/types` | Signed in | Event types |
+| GET | `/api/types` | Signed in (or visitor in demo) | Event types |
 | GET | `/api/users` | Planner, admin | Planners: names; admins: email, role, status, groups |
 | PUT | `/api/users/:id` | Admin | `role`, `active`, `groupIds` |
 | GET | `/api/groups` | Planner, admin | |
@@ -95,6 +98,13 @@ All bodies are JSON. Errors are `{ "error": string, "fields"?: { [field]: string
 Every event in a response carries `permissions: { edit, delete, join, leave }`,
 computed by `server/lib/policy.js`. The client shows controls from this object and
 never derives permissions itself.
+
+**Pagination.** The catalogue uses keyset pagination on `(start, id)` rather than
+`OFFSET`, so pages stay stable while events are added or removed. Access rules run in
+JavaScript, so the route reads database batches until the page is full. The cursor is
+the position of the last row read, visible or not, so no event is repeated or skipped.
+The client loads the next page when a sentinel near the bottom scrolls into view, and
+merges live updates only into the part of the list already loaded.
 
 ### Security model
 - **Passwords:** bcrypt (cost 12) with a unique per-password salt embedded in the hash.
@@ -135,6 +145,11 @@ WebSocket server, and it reuses the session cookie and ACLs as they are.
   someone's groups therefore reaches their stream within 5 minutes; REST requests
   see it immediately. After a reconnect the client reloads its list to catch anything
   it missed while disconnected.
+- **Dead connections:** the server sends a `ping` event every 15 seconds. If nothing
+  arrives for 40 seconds, the client closes and reopens the stream. This covers
+  connections that a proxy keeps open after the API restarts, which the browser
+  cannot detect by itself. SSE comment lines would not work for this, because
+  browsers never pass them to the page.
 - **Client:** one shared `EventSource` (`client/src/lib/live.js`) for the whole app.
   The catalogue merges messages into its list (`liveMerge.js`, applying the same
   filters as the server). Manage Events reloads its table. Saves in the editor modal
@@ -149,3 +164,32 @@ pass `state={{ background: location }}`. `App.jsx` renders the page routes at th
 background location and the editor in a second route table, so the URL is still
 `/manage/new` or `/manage/:id/edit` and links can be shared or bookmarked. On a direct
 visit there is no background, so Manage Events renders underneath the modal.
+
+### Demo mode
+`DEMO_MODE=true` turns the app into a public showcase (setup in the README). The code
+lives in `server/demo/` and two policy rules.
+
+- **Visitors:** catalogue routes use `authenticateWith({ allowVisitor: true })`.
+  Requests without a valid session continue as `policy.VISITOR` (id 0, role
+  `visitor`, no groups). The normal ACL then limits them to public events. Routes
+  that change data add `requireUser`, which answers 401 for visitors. The user and
+  group lists stay closed to visitors.
+- **Guests:** `POST /api/demo/guest` creates a `user`-role account with a random
+  `guest-…@demo.invalid` email and a shared bcrypt hash of a discarded random secret,
+  so nobody can sign in as a guest with a password. The session cookie lasts
+  `DEMO_EVENT_TTL_HOURS`, so a guest can still leave an event the next day.
+- **Policy:** in demo mode, anyone with a session can create events
+  (`canCreateEvent`) and manage the events they organize (`canManageEvent`).
+  Restricted audiences stay planner-only (`canRestrictEvent`), because choosing
+  groups or invitees needs the user and group lists. Guests are limited to 5 new
+  events an hour.
+- **Showcase and simulation:** `server/demo/showcase.js` keeps 48 upcoming public
+  events organized by `host@demo.invalid` and 160 simulated attendees
+  (`bot-NNN@demo.invalid`, hidden from user lists). `server/demo/index.js` signs
+  attendees up and off at about 2-3 changes a second and pushes each change through
+  `live.eventChanged`, the same path real sign-ups use.
+- **Cleanup:** every 10 minutes, and at startup, guest events older than the TTL are
+  soft-deleted. Guests older than the TTL are then deactivated (which also revokes
+  their tokens), their sign-ups are deleted, and open catalogues are notified.
+  Only guest-created data expires, so turning demo mode on over existing data never
+  deletes real events.

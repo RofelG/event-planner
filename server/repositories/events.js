@@ -39,7 +39,7 @@ function toEvent(row) {
     cost: Number(row.event_cost),
     type: { id: row.event_type, name: row.type_name },
     organizerId: row.event_organizer,
-    organizer: { id: row.event_organizer, name: `${row.organizer_first} ${row.organizer_last}` },
+    organizer: { id: row.event_organizer, name: `${row.organizer_first} ${row.organizer_last}`.trim() },
     visibility: row.event_visibility,
     attendeeCount: Number(row.attendee_count),
     isRegistered: Boolean(row.is_registered),
@@ -84,7 +84,7 @@ module.exports = {
    * Active events, unfiltered by ACL. Callers MUST pass the result through
    * policy.canViewEvent before returning anything to a client.
    */
-  async list(viewerId, { includePast = false, typeId, search } = {}) {
+  async list(viewerId, { includePast = false, typeId, search, mine = false, after, limit } = {}) {
     let sql = BASE_SELECT;
     const params = [viewerId];
     if (!includePast) sql += ' AND e.event_date_end > UTC_TIMESTAMP()';
@@ -97,9 +97,50 @@ module.exports = {
       const like = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
       params.push(like, like, like);
     }
-    sql += ' ORDER BY e.event_date_start ASC';
+    if (mine) {
+      sql += ' AND EXISTS (SELECT 1 FROM registration rm WHERE rm.event_id = e.event_id AND rm.user_id = ?)';
+      params.push(viewerId);
+    }
+    // Keyset pagination: rows strictly after the last one the client has, in
+    // (start, id) order. Stable while rows are added or removed, unlike OFFSET.
+    if (after) {
+      sql += ' AND (e.event_date_start > ? OR (e.event_date_start = ? AND e.event_id > ?))';
+      params.push(after.start, after.start, after.id);
+    }
+    sql += ' ORDER BY e.event_date_start ASC, e.event_id ASC';
+    if (limit) {
+      sql += ' LIMIT ?';
+      params.push(limit);
+    }
     const rows = await query(sql, params);
     return rows.map(toEvent);
+  },
+
+  /**
+   * Demo mode: soft-deletes events organized by guests that are older than
+   * ttlHours, and returns them as they were (for live `remove` messages).
+   */
+  async expireGuestEvents(ttlHours) {
+    const rows = await query(
+      `${BASE_SELECT}
+         AND o.user_email LIKE 'guest-%@demo.invalid'
+         AND e.created_at < NOW() - INTERVAL ? HOUR`,
+      [0, ttlHours]
+    );
+    const expired = rows.map(toEvent);
+    if (expired.length) {
+      await query('UPDATE event SET event_status = -1 WHERE event_id IN (?)', [expired.map((e) => e.id)]);
+    }
+    return expired;
+  },
+
+  /** How many events the user created in the last `hours` (demo rate limit). */
+  async countCreatedSince(organizerId, hours) {
+    const [row] = await query(
+      'SELECT COUNT(*) AS n FROM event WHERE event_organizer = ? AND created_at > NOW() - INTERVAL ? HOUR',
+      [organizerId, hours]
+    );
+    return Number(row.n);
   },
 
   /** A single active event, unfiltered by ACL (see list). */

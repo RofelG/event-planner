@@ -45,14 +45,14 @@ function useForm(initial) {
 }
 
 export function LoginPage() {
-  const { user, status, expired, login } = useAuth();
+  const { signedIn, status, expired, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { form, set, errors, message, busy, run } = useForm({ email: '', password: '' });
   const destination = location.state?.from?.pathname || '/';
 
   if (status === 'loading') return <PageLoader />;
-  if (user) return <Navigate to={destination} replace />;
+  if (signedIn) return <Navigate to={destination} replace />;
 
   const submit = (e) => {
     e.preventDefault();
@@ -80,12 +80,12 @@ export function LoginPage() {
 }
 
 export function RegisterPage() {
-  const { user, status, register } = useAuth();
+  const { signedIn, status, register } = useAuth();
   const navigate = useNavigate();
   const { form, set, errors, message, busy, run } = useForm({ first: '', last: '', email: '', password: '' });
 
   if (status === 'loading') return <PageLoader />;
-  if (user) return <Navigate to="/" replace />;
+  if (signedIn) return <Navigate to="/" replace />;
 
   const submit = (e) => {
     e.preventDefault();

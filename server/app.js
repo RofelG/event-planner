@@ -12,6 +12,7 @@ const { HttpError } = require('./lib/errors');
 const authRoutes = require('./routes/auth');
 const eventRoutes = require('./routes/events');
 const adminRoutes = require('./routes/admin');
+const demoRoutes = require('./routes/demo');
 
 const app = express();
 
@@ -37,14 +38,20 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 // Public routes (register, login, logout). /me and /password authenticate inside.
 app.use('/api/auth', authRoutes);
 
-// Everything below requires a signed-in user.
+// Demo mode settings (public) and guest names (demo only).
+app.use('/api/demo', demoRoutes);
+
+// Everything below requires a signed-in user. In demo mode the catalogue,
+// stream and types also accept visitors (no session), who see public events
+// only; event routes that change data still require a user (requireUser).
+const catalogueAuth = authenticateWith({ allowVisitor: true });
 
 // Live catalogue updates (Server-Sent Events). Registered before /api/events so
 // it uses the non-sliding session check: an open tab must not keep an idle
 // session alive.
-app.get('/api/events/stream', authenticateWith({ slide: false }), live.stream);
-app.use('/api/events', authenticate, eventRoutes);
-app.use('/api/types', authenticate, adminRoutes.types);
+app.get('/api/events/stream', authenticateWith({ slide: false, allowVisitor: true }), live.stream);
+app.use('/api/events', catalogueAuth, eventRoutes);
+app.use('/api/types', catalogueAuth, adminRoutes.types);
 app.use('/api/users', authenticate, adminRoutes.users);
 app.use('/api/groups', authenticate, adminRoutes.groups);
 
