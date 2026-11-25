@@ -6,3 +6,6 @@ coverage/
 .env
 db_connect.js
 .DS_Store
+.env.*
+!.env.example
+!.env.production.example

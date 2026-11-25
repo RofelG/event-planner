@@ -92,3 +92,8 @@ Set `DEMO_MODE=true` in `.env` to run the app as a public showcase:
 Demo mode only adds rows; it never changes existing users or events. It does add about
 160 simulated users, so point `DB_DB` at a separate database for a demo. Guests are
 limited to 10 new names per hour per IP address and 5 new events per hour.
+
+## Deployment
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) to run the app on a VPS with Docker
+Compose and automatic HTTPS.
